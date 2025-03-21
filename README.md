@@ -130,6 +130,7 @@ The following functionality will be removed:
 		ocamlc -c ast.ml
 		ocamlc -c parser.mli
 		ocamlc -c parser.ml
+  		ocamlc -c scanner.ml
 		ocamlc -c mnemo.ml
 		ocamlc -o mnemo ast.cmo parser.cmo scanner.cmo mnemo.cmo
 
