@@ -112,7 +112,7 @@ The following functionality will be removed:
 	~  All printouts are done inside the interpreter in OCaml during the game
 	   loop logic.  There is no need for a separate print function.
 
-==============================================================================
+==========================================================================
 
 
 TO BUILD:
