@@ -1,9 +1,14 @@
+# mnemo
+ Mnemo - A Text-Based Adventure Programming Language
+ 
 NOTES/README - Dallas
 
 The scanner, parser, and interpreter are all functional and working.  You can
 now compile code and run games in the terminal.
 
-### Implemented Features
+![demo](https://github.com/user-attachments/assets/dcaaa498-0e60-4d3e-8a9a-c98ecc707761)
+
+## Implemented Features
 Thus far I have implemented the following features:
 
  -  Object creation and storing object variables including:
@@ -52,7 +57,7 @@ Thus far I have implemented the following features:
  -  All operations
 	*  Binary ops, unary ops, etc.
 
-### Features to be Implemented
+## Features to be Implemented
 
 The following functionality still needs to be implemented:
 
@@ -79,7 +84,7 @@ The following functionality still needs to be implemented:
 	-  So far, Narrative object declarations already have all permutations
 	   included.  This will be extended to Items and Characters as well.
 
-### Features that Should be Implemented
+## Features that Should be Implemented
 The following functionality is not in the manual but should be implemented:
 
   *  Separate text box for printing status changes
@@ -95,7 +100,7 @@ The following functionality is not in the manual but should be implemented:
 	-  Most of the hard work is done.  I think the terminal display can be
 	   swapped for OCaml's graphics module for a better visual experience.
 
-### Features to be Removed
+## Features to be Removed
 The following functionality will be removed:
 
  *  Export, Import
