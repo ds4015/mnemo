@@ -1,11 +1,9 @@
-# mnemo
-Mnemo - A Text-Based Adventure Programming Language
-
 NOTES/README - Dallas
 
 The scanner, parser, and interpreter are all functional and working.  You can
 now compile code and run games in the terminal.
 
+### Implemented Features
 Thus far I have implemented the following features:
 
  -  Object creation and storing object variables including:
@@ -54,74 +52,72 @@ Thus far I have implemented the following features:
  -  All operations
 	*  Binary ops, unary ops, etc.
 
+### Features to be Implemented
 
 The following functionality still needs to be implemented:
 
- +  Remaining Functions
-	>  Remove item from inventory
-	>  Clear inventory
-	>  Use item
-	>  Sell item
-	>  Set character name
-	>  Inventory size function
+ *  Remaining Functions
+	-  Remove item from inventory
+	-  Clear inventory
+	-  Use item
+	-  Sell item
+	-  Set character name
+	-  Inventory size function
 
- +  Auto-concatenation
-	>  Two text types adjacent to each should be concatenated.
+ *  Auto-concatenation
+	-  Two text types adjacent to each should be concatenated.
 
- +  Conditions/Flow Control
-	>  If, elif, else
+ *  Conditions/Flow Control
+	-  If, elif, else
 
- +  Object Declaration Permutations
-	>  Objects should be able to be declared with or without optional tags
+ *  Object Declaration Permutations
+	-  Objects should be able to be declared with or without optional tags
 	   like "label=", "name=", "hp=", etc.  
-	>  All possible permutations of tags + no tags will be implemented to 
+	-  All possible permutations of tags + no tags will be implemented to 
 	   make sure you can either include or exclude whatever you want while
 	   writing code.
-	>  So far, Narrative object declarations already have all permutations
+	-  So far, Narrative object declarations already have all permutations
 	   included.  This will be extended to Items and Characters as well.
 
-
+### Features that Should be Implemented
 The following functionality is not in the manual but should be implemented:
 
-  %  Separate text box for printing status changes
-	=  Item acquisition, item selling, HP loss, level up, etc.
+  *  Separate text box for printing status changes
+	-  Item acquisition, item selling, HP loss, level up, etc.
 
-  %  Inventory Display
-	=  Some way of displaying items in a character's inventory
+  *  Inventory Display
+	-  Some way of displaying items in a character's inventory
 
-  %  Store Display
-	=  A text display for shops to buy and sell items
+  *  Store Display
+	-  A text display for shops to buy and sell items
 
-  %  Graphics Module!
-	=  Most of the hard work is done.  I think the terminal display can be
+  *  Graphics Module!
+	-  Most of the hard work is done.  I think the terminal display can be
 	   swapped for OCaml's graphics module for a better visual experience.
 
-
+### Features to be Removed
 The following functionality will be removed:
 
- #  Export, Import
-	~  There is no need for these features.  The game code is typed up in a
+ *  Export, Import
+	-  There is no need for these features.  The game code is typed up in a
            text file and automatically runs as an argument passed to the program
 	   in the terminal.  These text files can easily be shared, almost like
 	   individual game "cartridges."
 
- #  Concatenate operator
-	~  Cannot see when a label would want to be concatenated to text type.
+ *  Concatenate operator
+	-  Cannot see when a label would want to be concatenated to text type.
 
- #  Print Function
-	~  All printouts are done inside the interpreter in OCaml during the game
+ *  Print Function
+	-  All printouts are done inside the interpreter in OCaml during the game
 	   loop logic.  There is no need for a separate print function.
 
-===================================================================================
-
-
-TO BUILD:
+## Build Instructions
 
 	There are four main files:
-		>  ast.ml		Abstract Syntax Tree
-		>  scanner.mll		Scanner/Lexer
-		>  parser.mly		Parser
-		>  mnemo.ml		Interpreter/Game Loop Logic
+		*  ast.ml		Abstract Syntax Tree
+		*  scanner.mll		Scanner/Lexer
+		*  parser.mly		Parser
+		*  mnemo.ml		Interpreter/Game Loop Logic
 
 	Run the following in terminal:
 		ocamllex scanner.mll
