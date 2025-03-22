@@ -6,7 +6,7 @@ NOTES/README - Dallas
 The scanner, parser, and interpreter are all functional and working.  You can
 now compile code and run games in the terminal.
 
-![mnemo-gui-demo](https://github.com/user-attachments/assets/94331cb8-f0c4-4213-aaec-384542cfe1f8)
+![mnemo_gui_demo](https://github.com/user-attachments/assets/9badc993-c898-43fa-909c-fb9824152821)
 
 
 ![demo](https://github.com/user-attachments/assets/dcaaa498-0e60-4d3e-8a9a-c98ecc707761)
