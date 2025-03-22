@@ -4,7 +4,7 @@
 NOTES/README - Dallas
 
 The scanner, parser, and interpreter are all functional and working.  You can
-now compile code and run games in the terminal.
+now compile code and run games.
 
 ![mnemo_gui_demo](https://github.com/user-attachments/assets/9badc993-c898-43fa-909c-fb9824152821)
 
@@ -60,6 +60,10 @@ Thus far I have implemented the following features:
  -  All operations
 	*  Binary ops, unary ops, etc.
 
+ -  Graphics Module
+	*  GUI and interactivity via Ocaml Graphics!
+   
+
 ## Features to be Implemented
 
 The following functionality still needs to be implemented:
@@ -99,9 +103,6 @@ The following functionality is not in the manual but should be implemented:
   *  Store Display
 	-  A text display for shops to buy and sell items
 
-  *  Graphics Module!
-	-  Most of the hard work is done.  I think the terminal display can be
-	   swapped for OCaml's graphics module for a better visual experience.
 
 ## Features to be Removed
 The following functionality will be removed:
@@ -126,20 +127,20 @@ The following functionality will be removed:
 		*  scanner.mll		Scanner/Lexer
 		*  parser.mly		Parser
 		*  mnemo.ml		Interpreter/Game Loop Logic
-
+  
 	Run the following in terminal:
-		ocamllex scanner.mll
-		ocamlyacc parser.mly
-		ocamlc -c ast.ml
-		ocamlc -c parser.mli
-		ocamlc -c parser.ml
-  		ocamlc -c scanner.ml
-		ocamlc -c mnemo.ml
-		ocamlc -o mnemo ast.cmo parser.cmo scanner.cmo mnemo.cmo
+ 		opam install graphics
+   		ocamlbuild -use-ocamlfind mnemo.native -pkg graphics
 
+	On MacOS, installing the graphics module should install XQuartz.
+ 	Restart your Mac after installing before building.
+
+  	On Windows, install WSL (Ubuntu on Windows) and run the
+   	above in the Ubuntu terminal.
+    
 	This compiles the executable; to run it:
 
-	./mnemo <game_file.txt>
+	./mnemo.native <game_file.txt>
 
 	Where <game_file> is a text file with your code!
 
