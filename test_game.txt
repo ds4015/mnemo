@@ -1,0 +1,28 @@
+/code
+alice = Character("Alice", 1, 500)
+bob = Character("Robert", 1, 500)
+/end_code
+/nodes
+alice: "Hello, Bob."
+bob: "Hi, Alice."
+alice: "How are you?"
+bob: "Not bad, and yourself?"
+alice: "Fantastic."
+bob: "Where do you want to go?"
+ @"Forest", next=!forest
+ @"Desert", next=!desert
+/end_nodes
+/code
+herder = Character("Herder", 10, 3000)
+man = Character("Old Man", 15, 5000)
+/end_code
+/nodes
+herder: "What!? Where did you come from?", label=!desert
+alice: "Um, I'm not sure. I just teleported here."
+herder: "I see. Well, help me with these animals if you don't mind."
+/end_nodes
+/nodes
+man: "Welcome to the forest.", label=!forest
+alice: "Thanks. Where's your shirt?"
+man: "We don't wear shirts in this humid weather."
+/end_nodes

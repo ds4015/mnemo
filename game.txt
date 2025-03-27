@@ -1,0 +1,16 @@
+/code
+mary = Character("Mary Magdalene", 1, 500)
+shopkeeper = Character("Shopkeeper", 2, 700)
+/end_code
+/nodes
+mary: "I'm so hungry."
+shopkeeper: "I have this bread that's normally fairly expensive\new but it's stale, so you can have it."
+/end_nodes
+/code
+bread = Item("Bread", "o", 1, false, 1, 20, true)
+mary.inventory.add(bread)
+/end_code
+/nodes
+mary: "Oh, thank you so much!"
+shopkeeper: "Don't mention it."
+/end_nodes
