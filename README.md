@@ -6,9 +6,9 @@ NOTES/README - Dallas
 The scanner, parser, and interpreter are all functional and working.  You can
 now compile code and run games.
 
-![mnemo_gui_demo](https://github.com/user-attachments/assets/9badc993-c898-43fa-909c-fb9824152821)
+![gui_demo](https://github.com/user-attachments/assets/d7bde540-2aec-4024-8f7b-8d280dfb01bf)
 
-![demo](https://github.com/user-attachments/assets/dcaaa498-0e60-4d3e-8a9a-c98ecc707761)
+![acquire_item](https://github.com/user-attachments/assets/37ede206-6f83-4210-ab93-766d980f9740)
 
 ## Implemented Features
 Thus far I have implemented the following features:
