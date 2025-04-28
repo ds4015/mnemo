@@ -61,6 +61,15 @@ block:
 exprs_seq:
  | expr_rule { [$1] }
  | exprs_seq expr_rule { $1 @ [$2] }
+ 
+elif_clauses:
+| { [] }
+| ELIF expr_rule exprs_seq elif_clauses
+   { ($2, $3) :: $4 }
+
+else_clause:
+| { None }
+| ELSE exprs_seq { Some($2) }
 
 (* stream of nodes - /nodes block *)
 node_stream:
@@ -127,6 +136,8 @@ expr_rule:
  | expr_rule PLUSPLUS { Unop ($1, Incr) }
  | expr_rule MINUSMINUS { Unop ($1, Decr) }
  | NOT expr_rule { Unop ($2, Not) }
+ | IF expr_rule exprs_seq elif_clauses else_clause
+     { IfExpr($2, $3, $4, $5) }
  | VARIABLE EQ expr_rule { Asn ($1, $3) }
  (* add item to inventory *)
  | VARIABLE DOT INVENTORY DOT ADD LPAREN VARIABLE RPAREN { AddItem ($1, $7) }

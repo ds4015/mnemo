@@ -26,7 +26,8 @@ type node = {
 
 (* expressions *)
 type expr =
-    Binop of expr * operator * expr
+    IfExpr of expr * expr list * (expr * expr list) list * expr list option
+    | Binop of expr * operator * expr
     | Unop of expr * unaryop
     | IntLit of int
     | TextLit of string
