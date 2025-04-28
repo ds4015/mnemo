@@ -1,5 +1,21 @@
 let rec eval expr =
   match expr with
+  | IfExpr (cond, then_block, elifs, else_block) ->
+    (match eval cond with
+     | Bool true -> eval (Seq then_block)
+     | Bool false ->
+        let rec eval_elif = function
+          | [] -> (match else_block with
+                  | Some block -> eval (Seq block)
+                  | None -> ValUnit)
+          | (cond_expr, block) :: rest ->
+            (match eval cond_expr with
+             | Bool true -> eval (Seq block)
+             | Bool false -> eval_elif rest
+             | _ -> failwith "Elif condition must be a boolean")
+        in
+        eval_elif elifs
+     | _ -> failwith "If condition must be a boolean")
   | IntLit(i) -> Int(i)
   | BoolLit(b) -> Bool(b)
   | LabelLit(l) -> Label(l)
