@@ -26,8 +26,7 @@ type node = {
 
 (* expressions *)
 type expr =
-    IfExpr of expr * expr list * (expr * expr list) list * expr list option
-    | Binop of expr * operator * expr
+    Binop of expr * operator * expr
     | Unop of expr * unaryop
     | IntLit of int
     | TextLit of string
@@ -48,7 +47,7 @@ type expr =
     | NodeBlock of string * expr list * string
     | Chrc of string * string * int * int * item list
     | AddItem of string * string
-    | If of expr * expr * expr
+    | IfExpr of expr * expr list * (expr * expr list) list * expr list option
 
 (* more records *)
 type chrctr = {
