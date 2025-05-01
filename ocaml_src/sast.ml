@@ -62,7 +62,7 @@ and sx =
     | SNodeBlock of string * sexpr list * string
     | SChrc of string * string * int * int * item list
     | SAddItem of string * string
-    | SIf of sexpr * sexpr * sexpr
+    | SIfExpr of sexpr * sexpr list * (sexpr * sexpr list) list * sexpr list option
 
 /* 'if' not currently in parser - need to add stmt type */
 /* also need 'elif' and 'else' - here, parser, and ast */
