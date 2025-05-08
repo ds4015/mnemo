@@ -95,6 +95,29 @@ type value =
   | ValUnit
 
 (* printout for narrative eval - debug *)
+
+let string_of_typ = function
+    Int -> "int"
+  | Bool -> "bool"
+  | chrctr -> "character"
+  | narr -> "narrative"
+  | item -> "item"
+
+let string_of_op = function
+    Add -> "+"
+  | Sub -> "-"
+  | Mul -> "*"
+  | Div -> "/"
+  | Eq -> "is"
+  | Geq -> ">="
+  | Leq -> "<="
+  | Gt -> ">"
+  | Lt -> "<"  
+  | Incr -> "++"
+  | Decr -> "--"
+  | Not -> "~"
+
+
 let string_of_narrative narr =
   "Title: " ^ narr.title ^ ", Root: " ^ narr.root ^ ", Label: " ^ narr.narr_label
 
