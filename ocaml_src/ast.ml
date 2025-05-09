@@ -6,6 +6,7 @@ type unaryop = Incr | Decr | Not
 
 (* records *)
 type item = {
+    var_name: string;
     iname: string;
     usage: string;
     mutable num: int;
@@ -24,33 +25,8 @@ type node = {
     mutable next: int
 }
 
-(* expressions *)
-type expr =
-    Binop of expr * operator * expr
-    | Unop of expr * unaryop
-    | IntLit of int
-    | TextLit of string
-    | BoolLit of bool
-    | LabelLit of string
-    | FloatLit of float
-    | Node of node    
-    | Var of string
-    | Seq of expr list
-    | Tup of expr * expr
-    | ProcOpt of (expr list) * node
-    | Asn of string * expr
-    | Nar of string * string * string * string
-    | Itm of string * string * string * int * bool * int * int * bool
-    | Nde of string * int * string * string * (string * string) list * int
-    | NodeStream of string * expr list * string
-    | CodeBlock of string * expr list * string
-    | NodeBlock of string * expr list * string
-    | Chrc of string * string * int * int * item list
-    | AddItem of string * string
-    | IfExpr of expr * expr list * (expr * expr list) list * expr list option
-
-(* more records *)
 type chrctr = {
+    var_name: string;
     mutable name: string;
     mutable level: int;
     mutable hp: int;
@@ -63,7 +39,33 @@ type narr = {
     narr_label: string;
 }
 
+(* expressions *)
+type expr =
+    Binop of expr * operator * expr
+    | Unop of expr * unaryop
+    | IntLit of int
+    | TextLit of string
+    | BoolLit of bool
+    | LabelLit of string
+    | FloatLit of float
+    (* | Node of node     *)
+    | Var of string
+    | Seq of expr list
+    | Tup of expr * expr
+    | ProcOpt of (expr list) * node
+    | Asn of string * expr
+    | Nar of narr
+    | Itm of item
+    | Nde of node
+    | NodeStream of string * expr list * string
+    | CodeBlock of string * expr list * string
+    | NodeBlock of string * expr list * string
+    | Chrc of chrctr
+    | AddItem of string * string
+    | IfExpr of expr * expr list * (expr * expr list) list * expr list option
+
 type program = {
+    var_name: string;
     node_blocks: node;
     nodes_blocks: node list;
     expr: expr option;
@@ -145,8 +147,8 @@ let string_of_node nd =
   "Character: " ^ nd.character ^ ", ID: " ^ string_of_int nd.id ^ ", Dialogue: " ^ nd.dialogue ^
   ", Label: " ^ nd.label ^ ", Options: [" ^ string_of_options nd.options ^ "], Next: " ^ string_of_int nd.next
 
-let rec string_of_expr expr = function
- | Binop (e1, o, e2) -> string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
+let rec string_of_expr = function
+   Binop (e1, o, e2) -> string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
  | Unop (e, o) -> string_of_expr e ^ " " ^ string_of_unary_op o
  | IntLit (i) -> string_of_int i
  | TextLit (s) -> s
@@ -154,22 +156,38 @@ let rec string_of_expr expr = function
  | BoolLit (false) -> "false"
  | LabelLit (s) -> s
  | FloatLit (f) -> string_of_float f
- | Node (n) -> string_of_node n
+ (* | Node (n) -> string_of_node n *)
  | Var (s) -> s
  | Seq (l) -> String.concat ", " (List.map string_of_expr l)
  | Tup (e1, e2) -> "(" ^ string_of_expr e1 ^ ", " ^ string_of_expr e2 ^ ")"
  | ProcOpt (l, n) -> 
-    "(" ^ String.concat ", " (List.map (fun (s1, s2) -> "("s1 ^ ", " ^ s2 ^ ")") l)
- | Asn
- | Nar
- | Itm
- | Nde
- | NodeStream
- | CodeBlock
- | NodeBlock
- | Chrc
- | AddItem
- | IfExpr
+    "([" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ string_of_node n ^ ")"
+ | Asn (s, e) -> "(" ^ s ^ ", " ^ string_of_expr e ^ ")"
+ | Nar (nar) -> string_of_narrative nar 
+ | Itm (itm) -> string_of_item itm
+ | Nde (n) -> string_of_node n
+ | NodeStream (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")"
+ | CodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")"
+ | NodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")"
+ | Chrc (chrc) -> string_of_chrctr chrc
+ | AddItem (s1, s2) -> "(" ^ s1 ^ ", " ^ s2 ^ ")"
+ | IfExpr (e1, l1, l2, l3) -> 
+      let option_string ll = 
+      match ll with
+      | Some l -> "[" ^ String.concat ", " (List.map string_of_expr l) ^ "]"
+      | None -> "None"
+      in
+
+      let l2_string (e1, l) = "(" ^ string_of_expr e1 ^ ", [" ^
+                              String.concat ", " (List.map string_of_expr l) ^ "])"
+      in
+      
+      "(" ^ string_of_expr e1 ^ ", [" ^ 
+      String.concat ", " (List.map string_of_expr l1) ^ "], " ^
+      String.concat ", " (List.map l2_string l2) ^ "], " ^
+      option_string l3 ^ ")"
+                              
+
 
 (* printout for values - debug *)
 let string_of_value v =
