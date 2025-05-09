@@ -190,23 +190,27 @@ let rec string_of_expr = function
 
 
 (* printout for values - debug *)
-let string_of_value v =
+let rec string_of_value v =
   match v with
   | Int(i) -> string_of_int i
   | Bool(b) -> string_of_bool b
   | Float(f) -> string_of_float f
   | Text(t) -> t
   | String (s) -> string_of_expr s
+  | Empty (s1, s2) -> "Empty: (" ^ s1 ^ "," ^ s2  ^ ")"
   | Label(l) -> l
   | Narrative(narr) -> "Narrative: " ^ string_of_narrative narr
+  | Block l -> "Block: " ^ String.concat ", " (List.map string_of_expr l)
   | Inventory(items) -> "Inventory: " ^ string_of_item_list items
   | Options(opts) -> "Options: " ^ string_of_options opts
   | Item(it) -> "Item: " ^ string_of_item it
   | Character(chr) -> "Character: " ^ string_of_chrctr chr
   | Node(nd) -> "Node: " ^ string_of_node nd
-  | Node(ns) -> "Nodes: Stream of nodes created"
+  (* | Node(ns) -> "Nodes: Stream of nodes created" *)
   | Tuple(s1, s2) -> "Tuple: (" ^ s1 ^ ", " ^ s2 ^ ")"
-
+  | ItemAdd (v1, v2) -> "ItemAdd: (" ^ string_of_value v1 ^ ", " ^ string_of_value v2 ^ ")"
+  | ItemTup (v1, v2) -> "ItemTup: (" ^ string_of_value v1 ^ ", " ^ string_of_value v2 ^ ")"
+  | ValUnit -> "ValUnit"
 
   (* node id counter - auto increment *)
   let node_counter = ref 0
