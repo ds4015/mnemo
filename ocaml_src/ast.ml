@@ -37,7 +37,7 @@ type expr =
     | Var of string
     | Seq of expr list
     | Tup of expr * expr
-    | ProcOpt of ((string * string) list) * node
+    | ProcOpt of (expr list) * node
     | Asn of string * expr
     | Nar of string * string * string * string
     | Itm of string * string * string * int * bool * int * int * bool
@@ -96,12 +96,11 @@ type value =
 
 (* printout for narrative eval - debug *)
 
-let string_of_typ = function
-    Int -> "int"
-  | Bool -> "bool"
+(* NOTE: the function below should be deleted as it doesn't work*)
+(* let string_of_typ = function
   | chrctr -> "character"
   | narr -> "narrative"
-  | item -> "item"
+  | item -> "item" *)
 
 let string_of_op = function
     Add -> "+"
@@ -111,12 +110,13 @@ let string_of_op = function
   | Eq -> "is"
   | Geq -> ">="
   | Leq -> "<="
-  | Gt -> ">"
   | Lt -> "<"  
+  | Gt -> ">"
+
+let string_of_unary_op = function
   | Incr -> "++"
   | Decr -> "--"
   | Not -> "~"
-
 
 let string_of_narrative narr =
   "Title: " ^ narr.title ^ ", Root: " ^ narr.root ^ ", Label: " ^ narr.narr_label
@@ -145,6 +145,32 @@ let string_of_node nd =
   "Character: " ^ nd.character ^ ", ID: " ^ string_of_int nd.id ^ ", Dialogue: " ^ nd.dialogue ^
   ", Label: " ^ nd.label ^ ", Options: [" ^ string_of_options nd.options ^ "], Next: " ^ string_of_int nd.next
 
+let rec string_of_expr expr = function
+ | Binop (e1, o, e2) -> string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
+ | Unop (e, o) -> string_of_expr e ^ " " ^ string_of_unary_op o
+ | IntLit (i) -> string_of_int i
+ | TextLit (s) -> s
+ | BoolLit (true) -> "true"
+ | BoolLit (false) -> "false"
+ | LabelLit (s) -> s
+ | FloatLit (f) -> string_of_float f
+ | Node (n) -> string_of_node n
+ | Var (s) -> s
+ | Seq (l) -> String.concat ", " (List.map string_of_expr l)
+ | Tup (e1, e2) -> "(" ^ string_of_expr e1 ^ ", " ^ string_of_expr e2 ^ ")"
+ | ProcOpt (l, n) -> 
+    "(" ^ String.concat ", " (List.map (fun (s1, s2) -> "("s1 ^ ", " ^ s2 ^ ")") l)
+ | Asn
+ | Nar
+ | Itm
+ | Nde
+ | NodeStream
+ | CodeBlock
+ | NodeBlock
+ | Chrc
+ | AddItem
+ | IfExpr
+
 (* printout for values - debug *)
 let string_of_value v =
   match v with
@@ -152,6 +178,7 @@ let string_of_value v =
   | Bool(b) -> string_of_bool b
   | Float(f) -> string_of_float f
   | Text(t) -> t
+  | String (s) -> string_of_expr s
   | Label(l) -> l
   | Narrative(narr) -> "Narrative: " ^ string_of_narrative narr
   | Inventory(items) -> "Inventory: " ^ string_of_item_list items
