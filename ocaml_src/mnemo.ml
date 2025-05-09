@@ -3,7 +3,6 @@
 
 open Ast
 open Scanner
-open Semant
 exception Quit
 
 
@@ -61,13 +60,9 @@ and add_item_to_queue queue v i =
            Interactive Terminal
 *********************************************
 *)
-
-(* Display dialogue node to terminal *)
-let terminal_print_node cname dial =
-  Printf.printf "\n%s: %s\n\n" cname dial
   
 (* Display option node to terminal *)
-let terminal_proc_opt cname options =
+let rec terminal_proc_opt cname options =
   List.iteri (fun i (opt_text, _) ->
     Printf.printf "Option %d: %s\n" (i + 1) opt_text
   ) options;
@@ -82,6 +77,10 @@ let terminal_proc_opt cname options =
   with _ ->
     Printf.printf "Invalid input, try again.\n";
     terminal_proc_opt cname options
+    
+(* Display dialogue node to terminal *)
+let terminal_print_node cname dial =
+  Printf.printf "\n%s: %s\n\n" cname dial
 
 let terminal_pause () =
   Printf.printf "(Press ENTER to continue...)\n";
