@@ -1,5 +1,5 @@
 
-/* menemo smenatic checking */
+(* menemo smenatic checking *)
 
 open Ast
 open Sast
