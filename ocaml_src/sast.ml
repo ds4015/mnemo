@@ -1,12 +1,12 @@
-/* Semantically checked AST for mnemo */
+(* Semantically checked AST for mnemo *)
 
-/* NB - Dallas: 'if' included here at expr and stmt levels
+(* NB - Dallas: 'if' included here at expr and stmt levels
 	but not in parser yet; still need elif and else
-	both here, ast, and parser */
+	both here, ast, and parser *)
 
 open Ast
 
-/* types */
+(* types *)
 type typ = 
  | TInt
  | TString
@@ -20,7 +20,7 @@ type typ =
  | TList of typ
  | TTup of typ * typ
 
-/* for vars */
+(* for vars *)
 module Symbol = struct
 	type t = {
 		id: int;
@@ -35,10 +35,10 @@ module Symbol = struct
 		{ id; name; typ }
 end
 
-/* for vars and assignments */
+(* for vars and assignments *)
 type symbol = Symbol.t
 
-/* sexprs (sexy expressions) */
+(* sexprs (sexy expressions) *)
 type sexpr = typ * sx
 and sx =
     SBinop of sexpr * operator * sexpr
