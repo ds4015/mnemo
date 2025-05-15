@@ -3,7 +3,7 @@ open Ast
 st *)
 
 let () =
-  let filename = "example.mc" in
+  let filename = "example.mn" in
   let in_chan = open_in filename in
   let lexbuf = Lexing.from_channel in_chan in
   try
