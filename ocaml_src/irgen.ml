@@ -84,6 +84,8 @@ let translate (globals, functions) =
   let printf_func : L.llvalue =
     L.declare_function "printf" printf_t the_module in
 
+  let scanf_t = L.var_arg_function_type i32_t [| str_t |] in
+  let scanf_func = L.declare_function "__isoc99_scanf" scanf_t the_module in
 
   (* TODO: figure out how to handle module Symbol in sast *)
 
