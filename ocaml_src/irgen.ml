@@ -159,48 +159,117 @@ let translate (globals, functions) =
       | SIntLit i         -> L.const_int i32_t i
       | STextLit s        -> L.build_global_stringptr s "str" builder (* TODO: check this works *)
       | SBoolLit b        -> L.const_int i1_t (if b then 1 else 0)
-      | SLabelLit s       -> L.build_global_stringptr s "label" builder (* TODO: complete *)
+      | SLabelLit s       -> L.build_global_stringptr s "label" builder
       | SFloatLit f       -> L.const_float float_t f
-      | SVar sym          -> (* TODO: complete *)
-      | SSeq args         -> (* TODO: complete *)
-      | STup (e1, e2)     -> (* TODO: complete *)
-      | SProcOpt (args, nd) -> (* TODO: complete *)
-      | SAsn (sym, e1)    -> (* TODO: complete *)
-      | SNar (nrr)        -> (* TODO: complete *)
-      | SItm (itm)        -> (* TODO: complete *)
-      | SNde (nd)         -> (* TODO: complete *)
-      | SNodeStream (s1, args, s2) -> (* TODO: complete *)
-      | SCodeBlock (s1, args, s2) -> (* TODO: complete *)
-      | SNodeBlock (s1, args, s2) -> (* TODO: complete *)
-      | SChrc (chrctr)      -> (* TODO: complete *)
-      | SAddItem (s1, s2)   -> (* TODO: complete *)
-      | SIfExpr (e1, args1, list, option) -> (* TODO: complete *)
-
-    (* SLiteral i  -> L.const_int i32_t i
-      | SBoolLit b  -> L.const_int i1_t (if b then 1 else 0)
-      | SId s       -> L.build_load (lookup s) s builder
-      | SAssign (s, e) -> let e' = build_expr builder e in
-        ignore(L.build_store e' (lookup s) builder); e'
-      | SBinop (e1, op, e2) ->
-        let e1' = build_expr builder e1
-        and e2' = build_expr builder e2 in
-        (match op with
-           A.Add     -> L.build_add
-         | A.Sub     -> L.build_sub
-         | A.And     -> L.build_and
-         | A.Or      -> L.build_or
-         | A.Equal   -> L.build_icmp L.Icmp.Eq
-         | A.Neq     -> L.build_icmp L.Icmp.Ne
-         | A.Less    -> L.build_icmp L.Icmp.Slt
-        ) e1' e2' "tmp" builder
-      | SCall ("print", [e]) ->
-        L.build_call printf_func [| int_format_str ; (build_expr builder e) |]
-          "printf" builder
-      | SCall (f, args) ->
-        let (fdef, fdecl) = StringMap.find f function_decls in
-        let llargs = List.rev (List.map (build_expr builder) (List.rev args)) in
-        let result = f ^ "_result" in
-        L.build_call fdef (Array.of_list llargs) result builder *)
+      | SVar sym          -> L.build_load (lookup sym.name) sym.name builder
+      | SSeq args         ->
+          let rec eval_seq = function
+          | [] -> L.const_int i32_t 0
+          | [e] -> build_expr builder e
+          | e :: rest -> ignore (build_expr builder e); eval_seq rest
+          in eval_seq args
+      | STup (e1, e2)     ->
+          let v1 = build_expr builder e1 in
+          let v2 = build_expr builder e2 in
+          L.const_struct context [| v1; v2 |]
+      | SProcOpt (args, nd) -> 
+            L.const_int i32_t 0  (* Useless now, just Placeholder *)
+      | SAsn (sym, e1)    -> 
+          let e1' = build_expr builder e1 in
+          ignore (L.build_store e1' (lookup sym.name) builder); e1'(* TODO: check this works *)
+      | SNar (narr)        ->
+          let title_val = L.build_global_stringptr narr.title "title" builder in
+          let root_val = L.build_global_stringptr narr.root "root" builder in
+          let label_val = L.build_global_stringptr narr.narr_label "label" builder in
+          let struct_val = L.build_malloc narr_t "narr" builder in
+          let f0 = L.build_struct_gep struct_val 0 "f0" builder in
+          let f1 = L.build_struct_gep struct_val 1 "f1" builder in
+          let f2 = L.build_struct_gep struct_val 2 "f2" builder in
+          ignore (L.build_store title_val f0 builder);
+          ignore (L.build_store root_val f1 builder);
+          ignore (L.build_store label_val f2 builder);
+          struct_val
+      | SItm (itm)        ->
+          let var_val = L.build_global_stringptr item.var_name "var" builder in
+          let name_val = L.build_global_stringptr item.iname "name" builder in
+          let usage_val = L.build_global_stringptr item.usage "usage" builder in
+          let num_val = L.const_int i32_t item.num in
+          let uniq_val = L.const_int i1_t (if item.unique then 1 else 0) in
+          let dur_val = L.const_int i32_t item.dur in
+          let cost_val = L.const_int i32_t item.cost in
+          let cons_val = L.const_int i1_t (if item.cons then 1 else 0) in
+          let struct_val = L.build_malloc item_t "item" builder in
+          let fields = List.mapi (L.build_struct_gep struct_val) [0;1;2;3;4;5;6;7] in
+          List.iter2 (fun ptr v -> ignore (L.build_store v ptr builder)) fields
+            [var_val; name_val; usage_val; num_val; uniq_val; dur_val; cost_val; cons_val];
+          struct_val
+      | SNde (nd)         -> 
+        let char_val = L.build_global_stringptr node.character "character" builder in
+        let id_val = L.const_int i32_t node.id in
+        let dlg_val = L.build_global_stringptr node.dialogue "dialogue" builder in
+        let lbl_val = L.build_global_stringptr node.label "label" builder in
+        let opt_str = String.concat ";" (List.map (fun (a,b) -> a ^ ":" ^ b) node.options) in
+        let opt_val = L.build_global_stringptr opt_str "opts" builder in
+        let next_val = L.const_int i32_t node.next in
+        let struct_val = L.build_malloc node_t "node" builder in
+        let fields = List.mapi (L.build_struct_gep struct_val) [0;1;2;3;4;5] in
+        List.iter2 (fun ptr v -> ignore (L.build_store v ptr builder)) fields
+          [char_val; id_val; dlg_val; lbl_val; opt_val; next_val];
+        struct_val
+      | SNodeStream (s1, args, s2) -> 
+          List.iter (fun e1 -> ignore (build_expr builder e1)) args;
+          L.const_int i32_t 0
+      | SCodeBlock (s1, args, s2) ->
+          List.iter (fun e1 -> ignore (build_expr builder e1)) args;
+          L.const_int i32_t 0
+      | SNodeBlock (s1, args, s2) ->
+          List.iter (fun e1 -> ignore (build_expr builder e1)) args;
+          L.const_int i32_t 0
+      | SChrc (chrctr)      -> 
+          let var_val = L.build_global_stringptr chr.var_name "var" builder in
+          let name_val = L.build_global_stringptr chr.name "name" builder in
+          let lvl_val = L.const_int i32_t chr.level in
+          let hp_val = L.const_int i32_t chr.hp in
+          let inv_count = L.const_int i32_t (List.length chr.inventory) in
+          let struct_val = L.build_malloc chrctr_t "chr" builder in
+          let fields = List.mapi (L.build_struct_gep struct_val) [0;1;2;3;4] in
+          List.iter2 (fun ptr v -> ignore (L.build_store v ptr builder)) fields
+            [var_val; name_val; lvl_val; hp_val; inv_count];
+          struct_val
+      | SAddItem (s1, s2)   ->
+          let _ = L.build_global_stringptr s1 "item" builder in
+          let _ = L.build_global_stringptr s2 "target" builder in
+          L.const_int i32_t 0
+      | SIfExpr (cond, then_blk, elifs, else_blk) ->
+        let cond_val = build_expr builder cond in
+        let bool_val = L.build_icmp L.Icmp.Ne cond_val (L.const_int i1_t 0) "ifcond" builder in
+        let then_bb = L.append_block context "then" the_function in
+        let else_bb = L.append_block context "else" the_function in
+        let merge_bb = L.append_block context "ifcont" the_function in
+        ignore (L.build_cond_br bool_val then_bb else_bb builder);
+        let _ = build_expr (L.builder_at_end context then_bb) (SSeq then_blk) in
+        ignore (L.build_br merge_bb (L.builder_at_end context then_bb));
+        let _ =
+          match elifs, else_blk with
+          | [], None -> ()
+          | _, _ ->
+            let builder = L.builder_at_end context else_bb in
+            let _ =
+              match elifs with
+              | (elif_cond, elif_blk) :: _ ->
+                let elif_val = build_expr builder elif_cond in
+                let elif_bool = L.build_icmp L.Icmp.Ne elif_val (L.const_int i1_t 0) "elifcond" builder in
+                let elif_bb = L.append_block context "elif" the_function in
+                let _ = build_expr (L.builder_at_end context elif_bb) (SSeq elif_blk) in
+                ignore (L.build_cond_br elif_bool elif_bb merge_bb builder)
+              | [] ->
+                match else_blk with
+                | Some blk -> ignore (build_expr builder (SSeq blk))
+                | None -> ()
+            in
+            ignore (L.build_br merge_bb builder)
+        in
+        L.position_at_end merge_bb builder; L.const_int i32_t 0
     in
 
     (* NOTE: code below is copied from example, not examined yet!!*)
@@ -218,9 +287,7 @@ let translate (globals, functions) =
        the statement's successor (i.e., the next instruction will be built
        after the one generated by this call) *)
     let rec build_stmt builder = function
-        SBlock sl -> List.fold_left build_stmt builder sl
       | SExpr e -> ignore(build_expr builder e); builder
-      | SReturn e -> ignore(L.build_ret (build_expr builder e) builder); builder
       | SIf (predicate, then_stmt, else_stmt) ->
         let bool_val = build_expr builder predicate in
 
@@ -236,25 +303,9 @@ let translate (globals, functions) =
 
         ignore(L.build_cond_br bool_val then_bb else_bb builder);
         L.builder_at_end context end_bb
-
-      | SWhile (predicate, body) ->
-        let while_bb = L.append_block context "while" the_function in
-        let build_br_while = L.build_br while_bb in (* partial function *)
-        ignore (build_br_while builder);
-        let while_builder = L.builder_at_end context while_bb in
-        let bool_val = build_expr while_builder predicate in
-
-        let body_bb = L.append_block context "while_body" the_function in
-        add_terminal (build_stmt (L.builder_at_end context body_bb) body) build_br_while;
-
-        let end_bb = L.append_block context "while_end" the_function in
-
-        ignore(L.build_cond_br bool_val body_bb end_bb while_builder);
-        L.builder_at_end context end_bb
-
     in
     (* Build the code for each statement in the function *)
-    let func_builder = build_stmt builder (SBlock fdecl.sbody) in
+    (* let func_builder = build_stmt builder (SBlock fdecl.sbody) in *)
 
     (* Add a return if the last block falls off the end *)
     add_terminal func_builder (L.build_ret (L.const_int i32_t 0))
@@ -263,3 +314,4 @@ let translate (globals, functions) =
 
   List.iter build_function_body functions;
   the_module
+
