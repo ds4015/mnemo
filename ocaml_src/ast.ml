@@ -218,4 +218,4 @@ let rec string_of_value v =
   (* let string_of_program l =
     "\n\nScanned program: \n" ^ (List.fold_left (fun s e -> s ^ "\n" ^ e) "" l) *)
     let string_of_program expr =
-      "\n\nParsed program: \n\n" ^ string_of_expr expr ^ "\n"
+      "Parsed program: \n\n" ^ string_of_expr expr ^ "\n"
