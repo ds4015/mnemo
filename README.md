@@ -159,8 +159,16 @@ The following functionality will be removed:
 	Where <game_file> is a text file with your code!
 
 	The game will automatically run in the terminal.
- 
 
+## To generated a parsed version of the example.mn
+Run the following in the ocaml_src:
+```
+ocamlbuild test_parser.native
+./test_parser.native < example.mn > example.out
+```
+The parsed program will be in the file `example.out`
+
+## Other Notes
 All files are found in the PLT shared folder under "Hello World Front-end".  I
 have included a sample game code file, utop screenshots as things were being
 implemented, and a short video of the game being run in the terminal.
