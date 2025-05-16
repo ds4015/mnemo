@@ -1,7 +1,7 @@
 (* main.ml *)
 open Ast
 open Sast
-open Semant2  
+open Semant 
 open Scanner
 module Ir = Irgen
 
@@ -39,7 +39,7 @@ let () =
   in
 
   let globals = [] in
-  let (_g, sprogram) = Semant2.check (globals, program) in
+  let (_g, sprogram) = Semant.check (globals, program) in
 
   let llmod = Ir.translate (globals, sprogram) in
 
