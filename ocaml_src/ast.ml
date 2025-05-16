@@ -22,7 +22,7 @@ type node = {
     dialogue: string;
     label: string;
     options: (string * string) list;
-    mutable next: int
+    mutable next: int;
 }
 
 type chrctr = {
@@ -145,7 +145,7 @@ let string_of_chrctr chr =
 (* printout for node eval - debug *)
 let string_of_node nd =
   "Character: " ^ nd.character ^ ", ID: " ^ string_of_int nd.id ^ ", Dialogue: " ^ nd.dialogue ^
-  ", Label: " ^ nd.label ^ ", Options: [" ^ string_of_options nd.options ^ "], Next: " ^ string_of_int nd.next
+  ", Label: " ^ nd.label ^ ", Options: [" ^ string_of_options nd.options ^ "], Next: " ^ string_of_int nd.next ^ "\n"
 
 let rec string_of_expr = function
    Binop (e1, o, e2) -> string_of_expr e1 ^ " " ^ string_of_op o ^ " " ^ string_of_expr e2
@@ -160,19 +160,19 @@ let rec string_of_expr = function
  | Var (s) -> s
  | Seq (l) -> String.concat ", " (List.map string_of_expr l)
  | Tup (e1, e2) -> "(" ^ string_of_expr e1 ^ ", " ^ string_of_expr e2 ^ ")"
- | ProcOpt (l, n) -> 
+ | ProcOpt (l, n) ->
     "([" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ string_of_node n ^ ")"
  | Asn (s, e) -> "(" ^ s ^ ", " ^ string_of_expr e ^ ")"
- | Nar (nar) -> string_of_narrative nar 
- | Itm (itm) -> string_of_item itm
+ | Nar (nar) -> string_of_narrative nar
+ | Itm (itm) -> string_of_item itm ^ "\n"
  | Nde (n) -> string_of_node n
- | NodeStream (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")"
- | CodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")"
- | NodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")"
- | Chrc (chrc) -> string_of_chrctr chrc
+ | NodeStream (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")" ^ "\n\n"
+ | CodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")" ^ "\n\n"
+ | NodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_expr l) ^ "], " ^ s2 ^ ")" ^ "\n\n"
+ | Chrc (chrc) -> string_of_chrctr chrc ^ "\n"
  | AddItem (s1, s2) -> "(" ^ s1 ^ ", " ^ s2 ^ ")"
- | IfExpr (e1, l1, l2, l3) -> 
-      let option_string ll = 
+ | IfExpr (e1, l1, l2, l3) ->
+      let option_string ll =
       match ll with
       | Some l -> "[" ^ String.concat ", " (List.map string_of_expr l) ^ "]"
       | None -> "None"
@@ -182,10 +182,10 @@ let rec string_of_expr = function
                               String.concat ", " (List.map string_of_expr l) ^ "])"
       in
       
-      "(" ^ string_of_expr e1 ^ ", [" ^ 
+      "(" ^ string_of_expr e1 ^ ", [" ^
       String.concat ", " (List.map string_of_expr l1) ^ "], " ^
       String.concat ", " (List.map l2_string l2) ^ "], " ^
-      option_string l3 ^ ")"
+      option_string l3 ^ ")" ^ "\n"
                               
 
 
@@ -214,3 +214,8 @@ let rec string_of_value v =
 
   (* node id counter - auto increment *)
   let node_counter = ref 0
+
+  (* let string_of_program l =
+    "\n\nScanned program: \n" ^ (List.fold_left (fun s e -> s ^ "\n" ^ e) "" l) *)
+    let string_of_program expr =
+      "Parsed program: \n\n" ^ string_of_expr expr ^ "\n"
