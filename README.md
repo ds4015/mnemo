@@ -15,6 +15,7 @@ To compile (updated build instructions 5/16/25):
 ```
 brew install menhir
 
+cd ocaml_src
 ocamlc -c ast.ml
 ocamlc -c sast.ml
 ocamllex scanner.mll
