@@ -16,6 +16,15 @@ let translate (globals, sprogram) =
   let float_t = L.double_type ctx in
   let str_t   = L.pointer_type (L.i8_type ctx) in
 
+  let label_to_id =
+  List.fold_left (fun m (_, sx) ->
+    match sx with
+    | SNde nd ->
+        StringMap.add nd.label nd.id m
+    | _ -> m
+  ) StringMap.empty sprogram
+in
+
   let tuple_t   = L.struct_type ctx [| str_t; str_t |] in
   let tuple_ptr = L.pointer_type tuple_t in
 
@@ -25,7 +34,14 @@ let translate (globals, sprogram) =
 
   let node_t = L.named_struct_type ctx "node" in
   let _ = L.struct_set_body node_t
-    [| str_t; i32_t; str_t; str_t; tuple_ptr; i32_t |] false in
+    [| str_t;       (* character *)
+      i32_t;       (* id *)
+      str_t;       (* dialogue *)
+      str_t;       (* label *)
+      tuple_ptr;   (* options pointer or NULL *)
+      i32_t;       (* num_options *)
+      i32_t        (* next_id *)
+    |] false in
 
   let chrctr_t = L.named_struct_type ctx "chrctr" in
   let _ = L.struct_set_body chrctr_t
@@ -174,53 +190,111 @@ let translate (globals, sprogram) =
     | SNodeStream(_,exprs,_)->
         List.fold_left (fun _ e -> build_expr builder e) (L.const_int i32_t 0) exprs
 | SNde nd ->
-        let ch   = L.build_global_stringptr nd.character "who" builder in
-        let nid  = L.const_int             i32_t nd.id in
-        let dlg  = L.build_global_stringptr nd.dialogue "dlg" builder in
-        let lbl  = L.build_global_stringptr nd.label    "lbl" builder in
-        let opts = L.const_null                         tuple_ptr in
-        let nxt  = L.const_int             i32_t nd.next in
+    let ch       = L.build_global_stringptr nd.character "ch" builder in
+    let nid      = L.const_int             i32_t nd.id in
+    let dlg      = L.build_global_stringptr nd.dialogue  "dlg" builder in
+    let lbl      = L.build_global_stringptr nd.label     "lbl" builder in
 
-        let node_ptr = L.build_malloc node_t "node" builder in
+    let opts_ptr = L.const_null tuple_ptr in
+    let num_opts = L.const_int  i32_t 0 in
 
-        let f0 = L.build_in_bounds_gep node_ptr
-                   [| L.const_int i32_t 0; L.const_int i32_t 0 |]
-                   "f0" builder in
-        ignore (L.build_store ch  f0 builder);
+    let nxt      = L.const_int  i32_t nd.next in
 
-        let f1 = L.build_in_bounds_gep node_ptr
-                   [| L.const_int i32_t 0; L.const_int i32_t 1 |]
-                   "f1" builder in
-        ignore (L.build_store nid f1 builder);
+    let node_ptr = L.build_malloc node_t "node" builder in
 
-        let f2 = L.build_in_bounds_gep node_ptr
-                   [| L.const_int i32_t 0; L.const_int i32_t 2 |]
-                   "f2" builder in
-        ignore (L.build_store dlg f2 builder);
+    let store_field idx value =
+      let fld = L.build_in_bounds_gep node_ptr
+                  [| L.const_int i32_t 0; L.const_int i32_t idx |]
+                  ("f" ^ string_of_int idx)
+                  builder
+      in
+      ignore (L.build_store value fld builder)
+    in
 
-        let f3 = L.build_in_bounds_gep node_ptr
-                   [| L.const_int i32_t 0; L.const_int i32_t 3 |]
-                   "f3" builder in
-        ignore (L.build_store lbl f3 builder);
+    store_field 0 ch;       (* character *)
+    store_field 1 nid;      (* id        *)
+    store_field 2 dlg;      (* dialogue  *)
+    store_field 3 lbl;      (* label     *)
+    store_field 4 opts_ptr; (* options   *)
+    store_field 5 num_opts; (* num_opts  *)
+    store_field 6 nxt;      (* next_id   *)
 
-        let f4 = L.build_in_bounds_gep node_ptr
-                   [| L.const_int i32_t 0; L.const_int i32_t 4 |]
-                   "f4" builder in
-        ignore (L.build_store opts f4 builder);
+    ignore (L.build_call node_table_add_fn [| node_ptr |] "" builder);
 
-        let f5 = L.build_in_bounds_gep node_ptr
-                   [| L.const_int i32_t 0; L.const_int i32_t 5 |]
-                   "f5" builder in
-        ignore (L.build_store nxt f5 builder);
-
-        ignore (L.build_call node_table_add_fn [| node_ptr |] "" builder);
-
-        L.const_int i32_t 0
+    L.const_int i32_t 0
     | _              -> L.const_int i32_t 0
   in
 
   List.iter (fun sexpr -> ignore(build_expr builder sexpr)) sprogram;
 
-  ignore(L.build_ret (L.const_int i32_t 0) builder);
 
-  the_mod
+let printf_ty = L.var_arg_function_type i32_t [| L.pointer_type (L.i8_type ctx) |] in
+let printf_fn = L.declare_function "printf" printf_ty the_mod in
+let scanf_ty  = L.var_arg_function_type i32_t [| L.pointer_type (L.i8_type ctx) |] in
+let scanf_fn  = L.declare_function "scanf" scanf_ty the_mod in
+
+let fmt_node = L.build_global_stringptr "%s: %s\n\n"    "fmt_node" builder in
+let fmt_int  = L.build_global_stringptr "%d"            "fmt_int"  builder in
+
+let run_fn    = L.define_function "run" (L.function_type i32_t [||]) the_mod in
+let entry_bb  = L.entry_block run_fn in
+let head_bb   = L.append_block ctx "loop.head" run_fn in
+let body_bb   = L.append_block ctx "loop.body" run_fn in
+let exit_bb   = L.append_block ctx "loop.exit" run_fn in
+
+let b_entry = L.builder_at_end ctx entry_bb in
+let count   = L.build_load node_idx "count" b_entry in
+let cur_ptr = L.build_alloca i32_t "cur" b_entry in
+ignore (L.build_store (L.const_int i32_t 0) cur_ptr b_entry);
+ignore (L.build_br head_bb b_entry);
+
+let b_head = L.builder_at_end ctx head_bb in
+let cur    = L.build_load cur_ptr "cur" b_head in
+let cond   = L.build_icmp L.Icmp.Slt cur count "cond" b_head in
+ignore (L.build_cond_br cond body_bb exit_bb b_head);
+
+let b_body      = L.builder_at_end ctx body_bb in
+let gep         = L.build_in_bounds_gep node_array [| L.const_int i32_t 0; cur |] "node_ptr_ptr" b_body in
+let node_ptr    = L.build_load gep "node_ptr" b_body in
+
+
+let ch_ptr   = L.build_in_bounds_gep node_ptr [| L.const_int i32_t 0; L.const_int i32_t 0 |] "ch_ptr" b_body in
+let ch       = L.build_load ch_ptr "ch" b_body in
+let dlg_ptr  = L.build_in_bounds_gep node_ptr [| L.const_int i32_t 0; L.const_int i32_t 2 |] "dlg_ptr" b_body in
+let dlg      = L.build_load dlg_ptr "dlg" b_body in
+
+
+ignore (L.build_call printf_fn [| fmt_node; ch; dlg |] "" b_body);
+
+let choice_ptr = L.build_alloca i32_t "choice_ptr" b_body in
+ignore (L.build_call scanf_fn  [| fmt_int; choice_ptr |] "" b_body);
+let choice     = L.build_load choice_ptr "choice" b_body in
+
+let next_ptr = L.build_in_bounds_gep node_ptr
+                 [| L.const_int i32_t 0; L.const_int i32_t 6 |]
+                 "next_ptr" b_body in
+let stored_next = L.build_load next_ptr "stored_next" b_body in
+
+
+let ge0     = L.build_icmp L.Icmp.Sge choice (L.const_int i32_t 0)  "ge0"     b_body in
+let lt_count= L.build_icmp L.Icmp.Slt choice count "ltc"     b_body in
+let valid   = L.build_and ge0 lt_count "valid"   b_body in
+
+
+let chosen_next =
+  L.build_select valid choice stored_next "chosen_next" b_body
+in
+
+ignore (L.build_store chosen_next cur_ptr b_body);
+
+ignore (L.build_br head_bb b_body);
+
+let b_exit = L.builder_at_end ctx exit_bb in
+ignore (L.build_ret (L.const_int i32_t 0) b_exit);
+
+let main_builder = L.builder_at_end ctx (L.entry_block main_fn) in
+
+let _ = L.build_call run_fn [||] "runcall" main_builder in
+
+ignore (L.build_ret (L.const_int i32_t 0) main_builder);
+the_mod
