@@ -3,8 +3,41 @@
  
 NOTES/README - Dallas
 
-The scanner, parser, and interpreter are all functional and working.  You can
-now compile code and run games.
+5/16/25:
+
+The scanner, parser, AST, SAST, semantic analyzer, IRgen, and main driver are all functional and working.  
+
+To compile (updated build instructions 5/16/25):
+
+```
+brew install menhir
+
+ocamlc -c ast.ml
+ocamlc -c sast.ml
+ocamllex scanner.mll
+menhir --infer parser.mly
+ocamlc -c parser.mli
+ocamlc -c parser.ml
+ocamlfind ocamlopt \
+  -package llvm,llvm.analysis,llvm.bitwriter \
+  -linkpkg \
+  ast.ml sast.ml parser.ml scanner.ml semant.ml irgen.ml main.ml \
+  -o mnemo
+./mnemo test_game.txt test_game.ll
+llc -filetype=obj test_game.ll -o test_game.o
+clang test_game.o -o test_game
+./test_game
+```
+
+test_game.txt can be replaced with any source code file in the Mnemo language
+
+This will run the dialogue stream sequentially in the terminal and process branch options from user input.
+
+Demo:
+
+https://github.com/user-attachments/assets/daab91a7-fd63-4b77-8aca-058cff3303d9
+
+Earlier conception using runtime evaluator and OCaml Graphics GUI (experimental/non-IR):
 
 ![gui_demo](https://github.com/user-attachments/assets/d7bde540-2aec-4024-8f7b-8d280dfb01bf)
 
@@ -174,3 +207,6 @@ have included a sample game code file, utop screenshots as things were being
 implemented, and a short video of the game being run in the terminal.
 
 Have fun!
+
+
+
