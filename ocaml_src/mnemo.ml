@@ -2,7 +2,9 @@
 (* Dallas - NB: This is functional; updates coming *)
 
 open Ast
+open Irgen
 open Scanner
+open Semant
 exception Quit
 
 
@@ -40,7 +42,7 @@ module NodeTable = Hashtbl.Make(struct
     let hash = Hashtbl.hash
   end)
 
-let narrative_variables = NarrativeTable.create 10
+let narrative_variables : narr NarrativeTable.t = NarrativeTable.create 10
 let item_variables = ItemTable.create 10
 let character_variables = CharacterTable.create 10
 let nodes = NodeTable.create 10
@@ -62,7 +64,7 @@ and add_item_to_queue queue v i =
 *)
   
 (* Display option node to terminal *)
-let rec terminal_proc_opt cname options =
+let rec terminal_proc_opt cname (options : (string * string) list) =
   List.iteri (fun i (opt_text, _) ->
     Printf.printf "Option %d: %s\n" (i + 1) opt_text
   ) options;
@@ -103,10 +105,8 @@ let kill_dead_branch l =
     ) nodes
 
 (* process options after a branch *)       
-let process_options options n cname =
-  let opts = List.mapi (fun idx (option_text, _) -> option_text) options in
-  let choice = terminal_proc_opt cname opts + 1 in
-
+let process_options (options : (string * string) list) (node : Ast.node) (cname : string) =
+  let choice = terminal_proc_opt cname options + 1 in
   let next_label = snd (List.nth options (choice - 1)) in
 
   let found = 
@@ -115,7 +115,7 @@ let process_options options n cname =
       ) nodes None in
   match found with
   | Some node -> 
-    n.next <- node.id;
+    node.next <- node.id;
     List.iteri (fun idx opt ->
         let label = snd opt in
         if idx <> (choice - 1) then kill_dead_branch label else ()
@@ -128,9 +128,10 @@ let parse_file filename =
   let ic = open_in filename in
   let lexbuf = Lexing.from_channel ic in
   try
-    let parsed = Parser.exprs_rule Scanner.token lexbuf in
-    close_in ic;
-    let result = eval parsed in result
+    let parsed_ast = Parser.exprs_rule Scanner.token lexbuf in
+    let sem_checked = Semant.check parsed_ast in
+    let _ = Irgen.translate sem_checked in
+    close_in ic
   with e ->
     close_in ic;
     raise e

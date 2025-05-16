@@ -119,16 +119,27 @@ let rec check_expr = function
         let ch = List.map check_expr exprs in
         (TUnit, SNodeStream(start_kw, ch, end_kw))
     | Nar n ->
-        (TNar, SNar n)
+        (TNar, SNar ("", n.title, n.root, n.narr_label))
 
     | Itm i ->
-        (TItem, SItm i)
+        (TItem, SItm (i.var_name, i.iname, i.usage, i.num, i.unique, i.dur, i.cost, i.cons))
 
     | Chrc c ->
-        (TChar, SChrc c)
+        (TChar, SChrc (c.var_name, c.name, c.level, c.hp, c.inventory))
 
     | Nde nd ->
-        (TNode, SNde nd)
+        (TNode, SNde (nd.character, nd.id, nd.dialogue, nd.label, nd.options, nd.next))
 
     | AddItem (v1,v2) ->
         (TUnit, SAddItem(v1,v2))
+
+let check (expr : Ast.expr) : (typ * string) list * sfunc_def list =
+  let (_, sexpr) = check_expr expr in
+  let dummy_func = {
+    sfname = "main";
+    sformals = [];
+    slocals = [];
+    sbody = [SExpr (TUnit, sexpr)];
+    srtyp = TUnit;
+  } in
+  ([], [dummy_func])

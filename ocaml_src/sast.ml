@@ -20,6 +20,7 @@ type typ =
  | TList of typ
  | TTup of typ * typ
 
+
 (* for vars *)
 module Symbol = struct
 	type t = {
@@ -63,6 +64,19 @@ and sx =
     | SChrc of string * string * int * int * item list
     | SAddItem of string * string
     | SIfExpr of sexpr * sexpr list * (sexpr * sexpr list) list * sexpr list option
+
+type sstmt =
+  | SIf of sexpr * sstmt * sstmt
+  | SExpr of sexpr
+
+type sfunc_def = {
+  sfname: string;
+  sformals: (typ * string) list;
+  slocals: (typ * string) list;
+  sbody: sstmt list;
+  srtyp: typ;
+}
+
 
 (* Pretty-printing functions *)
 let rec string_of_typ = function

@@ -58,7 +58,7 @@ let translate (globals, functions) =
     [| str_t; str_t; str_t |] false in
 
   (* TODO: complete below if any type is missing  *)
-  let ltype_of_typ = function
+  let rec ltype_of_typ = function
       TInt -> i32_t
     | TBool -> i1_t 
     | TFloat -> float_t
@@ -91,14 +91,15 @@ let translate (globals, functions) =
 
   (* Define each function (arguments and return type) so we can
      call it even before we've created its body *)
-  (* let function_decls : (L.llvalue * sfunc_def) StringMap.t =
+  let function_decls : (L.llvalue * sfunc_def) StringMap.t =
     let function_decl m fdecl =
       let name = fdecl.sfname
       and formal_types =
         Array.of_list (List.map (fun (t,_) -> ltype_of_typ t) fdecl.sformals)
       in let ftype = L.function_type (ltype_of_typ fdecl.srtyp) formal_types in
       StringMap.add name (L.define_function name ftype the_module, fdecl) m in
-    List.fold_left function_decl StringMap.empty functions in *)
+    List.fold_left function_decl StringMap.empty functions
+  in
 
   (* Fill in the body of the given function *)
   let build_function_body fdecl =
@@ -179,10 +180,10 @@ let translate (globals, functions) =
       | SAsn (sym, e1)    -> 
           let e1' = build_expr builder e1 in
           ignore (L.build_store e1' (lookup sym.name) builder); e1'(* TODO: check this works *)
-      | SNar (narr)        ->
-          let title_val = L.build_global_stringptr narr.title "title" builder in
-          let root_val = L.build_global_stringptr narr.root "root" builder in
-          let label_val = L.build_global_stringptr narr.narr_label "label" builder in
+      | SNar (_var, title, root, narr_label) ->
+          let title_val = L.build_global_stringptr title "title" builder in
+          let root_val = L.build_global_stringptr root "root" builder in
+          let label_val = L.build_global_stringptr narr_label "label" builder in
           let struct_val = L.build_malloc narr_t "narr" builder in
           let f0 = L.build_struct_gep struct_val 0 "f0" builder in
           let f1 = L.build_struct_gep struct_val 1 "f1" builder in
@@ -191,33 +192,35 @@ let translate (globals, functions) =
           ignore (L.build_store root_val f1 builder);
           ignore (L.build_store label_val f2 builder);
           struct_val
-      | SItm (itm)        ->
-          let var_val = L.build_global_stringptr item.var_name "var" builder in
-          let name_val = L.build_global_stringptr item.iname "name" builder in
-          let usage_val = L.build_global_stringptr item.usage "usage" builder in
-          let num_val = L.const_int i32_t item.num in
-          let uniq_val = L.const_int i1_t (if item.unique then 1 else 0) in
-          let dur_val = L.const_int i32_t item.dur in
-          let cost_val = L.const_int i32_t item.cost in
-          let cons_val = L.const_int i1_t (if item.cons then 1 else 0) in
-          let struct_val = L.build_malloc item_t "item" builder in
-          let fields = List.mapi (L.build_struct_gep struct_val) [0;1;2;3;4;5;6;7] in
-          List.iter2 (fun ptr v -> ignore (L.build_store v ptr builder)) fields
-            [var_val; name_val; usage_val; num_val; uniq_val; dur_val; cost_val; cons_val];
-          struct_val
-      | SNde (nd)         -> 
-        let char_val = L.build_global_stringptr node.character "character" builder in
-        let id_val = L.const_int i32_t node.id in
-        let dlg_val = L.build_global_stringptr node.dialogue "dialogue" builder in
-        let lbl_val = L.build_global_stringptr node.label "label" builder in
-        let opt_str = String.concat ";" (List.map (fun (a,b) -> a ^ ":" ^ b) node.options) in
-        let opt_val = L.build_global_stringptr opt_str "opts" builder in
-        let next_val = L.const_int i32_t node.next in
-        let struct_val = L.build_malloc node_t "node" builder in
-        let fields = List.mapi (L.build_struct_gep struct_val) [0;1;2;3;4;5] in
+      | SItm (var_name, iname, usage, num, unique, dur, cost, cons) ->
+        let var_val = L.build_global_stringptr var_name "var" builder in
+        let name_val = L.build_global_stringptr iname "name" builder in
+        let usage_val = L.build_global_stringptr usage "usage" builder in
+        let num_val = L.const_int i32_t num in
+        let uniq_val = L.const_int i1_t (if unique then 1 else 0) in
+        let dur_val = L.const_int i32_t dur in
+        let cost_val = L.const_int i32_t cost in
+        let cons_val = L.const_int i1_t (if cons then 1 else 0) in
+        let struct_val = L.build_malloc item_t "item" builder in
+        let field_indices = [0;1;2;3;4;5;6;7] in
+        let fields = List.map (fun i -> L.build_struct_gep struct_val i ("f" ^ string_of_int i) builder) field_indices in
         List.iter2 (fun ptr v -> ignore (L.build_store v ptr builder)) fields
-          [char_val; id_val; dlg_val; lbl_val; opt_val; next_val];
+          [var_val; name_val; usage_val; num_val; uniq_val; dur_val; cost_val; cons_val];
         struct_val
+      | SNde (character, id, dialogue, label, options, next) ->
+          let char_val = L.build_global_stringptr character "character" builder in
+          let id_val = L.const_int i32_t id in
+          let dlg_val = L.build_global_stringptr dialogue "dialogue" builder in
+          let lbl_val = L.build_global_stringptr label "label" builder in
+          let opt_str = String.concat ";" (List.map (fun (a,b) -> a ^ ":" ^ b) options) in
+          let opt_val = L.build_global_stringptr opt_str "opts" builder in
+          let next_val = L.const_int i32_t next in
+          let struct_val = L.build_malloc node_t "node" builder in
+          let field_indices = [0;1;2;3;4;5] in
+          let fields = List.map (fun i -> L.build_struct_gep struct_val i ("f" ^ string_of_int i) builder) field_indices in
+          List.iter2 (fun ptr v -> ignore (L.build_store v ptr builder)) fields
+            [char_val; id_val; dlg_val; lbl_val; opt_val; next_val];
+          struct_val
       | SNodeStream (s1, args, s2) -> 
           List.iter (fun e1 -> ignore (build_expr builder e1)) args;
           L.const_int i32_t 0
@@ -227,14 +230,15 @@ let translate (globals, functions) =
       | SNodeBlock (s1, args, s2) ->
           List.iter (fun e1 -> ignore (build_expr builder e1)) args;
           L.const_int i32_t 0
-      | SChrc (chrctr)      -> 
-          let var_val = L.build_global_stringptr chr.var_name "var" builder in
-          let name_val = L.build_global_stringptr chr.name "name" builder in
-          let lvl_val = L.const_int i32_t chr.level in
-          let hp_val = L.const_int i32_t chr.hp in
-          let inv_count = L.const_int i32_t (List.length chr.inventory) in
+      | SChrc (var_name, name, level, hp, inventory) ->
+          let var_val = L.build_global_stringptr var_name "var" builder in
+          let name_val = L.build_global_stringptr name "name" builder in
+          let lvl_val = L.const_int i32_t level in
+          let hp_val = L.const_int i32_t hp in
+          let inv_count = L.const_int i32_t (List.length inventory) in
           let struct_val = L.build_malloc chrctr_t "chr" builder in
-          let fields = List.mapi (L.build_struct_gep struct_val) [0;1;2;3;4] in
+          let field_indices = [0;1;2;3;4] in
+          let fields = List.map (fun i -> L.build_struct_gep struct_val i ("f" ^ string_of_int i) builder) field_indices in
           List.iter2 (fun ptr v -> ignore (L.build_store v ptr builder)) fields
             [var_val; name_val; lvl_val; hp_val; inv_count];
           struct_val
@@ -249,7 +253,7 @@ let translate (globals, functions) =
         let else_bb = L.append_block context "else" the_function in
         let merge_bb = L.append_block context "ifcont" the_function in
         ignore (L.build_cond_br bool_val then_bb else_bb builder);
-        let _ = build_expr (L.builder_at_end context then_bb) (SSeq then_blk) in
+        let _ = List.iter (fun e -> ignore (build_expr (L.builder_at_end context then_bb) e)) then_blk in
         ignore (L.build_br merge_bb (L.builder_at_end context then_bb));
         let _ =
           match elifs, else_blk with
@@ -262,11 +266,11 @@ let translate (globals, functions) =
                 let elif_val = build_expr builder elif_cond in
                 let elif_bool = L.build_icmp L.Icmp.Ne elif_val (L.const_int i1_t 0) "elifcond" builder in
                 let elif_bb = L.append_block context "elif" the_function in
-                let _ = build_expr (L.builder_at_end context elif_bb) (SSeq elif_blk) in
+                let _ = List.iter (fun e -> ignore (build_expr (L.builder_at_end context elif_bb) e)) elif_blk in
                 ignore (L.build_cond_br elif_bool elif_bb merge_bb builder)
               | [] ->
                 match else_blk with
-                | Some blk -> ignore (build_expr builder (SSeq blk))
+                | Some blk -> List.iter (fun e -> ignore (build_expr builder e)) blk
                 | None -> ()
             in
             ignore (L.build_br merge_bb builder)
@@ -289,14 +293,14 @@ let translate (globals, functions) =
        the statement's successor (i.e., the next instruction will be built
        after the one generated by this call) *)
     let rec build_stmt builder = function
-      | SExpr e -> ignore(build_expr builder e); builder
-      | SIf (predicate, then_stmt, else_stmt) ->
-        let bool_val = build_expr builder predicate in
+      | SExpr e -> ignore (build_expr builder e); builder
+      | SIf (cond, then_s, else_s) ->
+        let bool_val = build_expr builder cond in
 
         let then_bb = L.append_block context "then" the_function in
-        ignore (build_stmt (L.builder_at_end context then_bb) then_stmt);
+        ignore (build_stmt (L.builder_at_end context then_bb) then_s);
         let else_bb = L.append_block context "else" the_function in
-        ignore (build_stmt (L.builder_at_end context else_bb) else_stmt);
+        ignore (build_stmt (L.builder_at_end context else_bb) else_s);
 
         let end_bb = L.append_block context "if_end" the_function in
         let build_br_end = L.build_br end_bb in (* partial function *)
@@ -310,10 +314,16 @@ let translate (globals, functions) =
     (* let func_builder = build_stmt builder (SBlock fdecl.sbody) in *)
 
     (* Add a return if the last block falls off the end *)
-    add_terminal func_builder (L.build_ret (L.const_int i32_t 0))
-
+    add_terminal builder (L.build_ret (L.const_int i32_t 0))
   in
 
   List.iter build_function_body functions;
+
+  (* Define a minimal main function to make the LLVM IR executable *)
+  let main_t = L.function_type i32_t [||] in
+  let main_func = L.define_function "main" main_t the_module in
+  let builder = L.builder_at_end context (L.entry_block main_func) in
+  ignore (L.build_ret (L.const_int i32_t 0) builder);
+
   the_module
 

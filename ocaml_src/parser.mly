@@ -1,6 +1,3 @@
-(* Mnemo Parser *)
-(* Dallas - NB: This is functional; updates coming *)
-
 %{
  open Ast
 %}
@@ -42,7 +39,6 @@
 
 %%
 
-(* main program - sequence of code blocks, node blocks, nodeS blocks *)
 exprs_rule:
   | blocks { Seq $1 }
 
@@ -60,12 +56,10 @@ block:
       NodeStream("NODES_BLOCK", $2, "END_NODES_BLOCK")
     }
 
-(* code block - sequence of non-node expressions *)
 exprs_seq:
  | expr_rule { [$1] }
  | exprs_seq expr_rule { $1 @ [$2] }
 
-(* stream of nodes - /nodes block *)
 node_stream:
    | node_expr { [$1] }
    | node_stream node_expr { $1 @ [$2] }
@@ -130,7 +124,6 @@ node_expr:
   }
 
 
-(* node options - tree branch *)
 opt_list:
     | option_expr                                   { [$1] }
     | opt_list option_expr                          { $2 :: $1 }
@@ -139,7 +132,6 @@ option_expr:
     | AT TEXT_LITERAL COMMA NEXT LABEL_LITERAL { Tup (TextLit $2, LabelLit $5) }
 
 
-(* expressions *)
 expr_rule:
  INT_LITERAL { IntLit $1 }
  | BOOL_LITERAL { BoolLit $1 }
@@ -161,9 +153,9 @@ expr_rule:
  | expr_rule MINUSMINUS { Unop ($1, Decr) }
  | NOT expr_rule { Unop ($2, Not) }
  | VARIABLE EQ expr_rule { Asn ($1, $3) }
- (* add item to inventory *)
+
  | VARIABLE DOT INVENTORY DOT ADD LPAREN VARIABLE RPAREN { AddItem ($1, $7) }
- (* narrative object declaration and storage - all permutations *)
+
 | VARIABLE EQ NARRATIVE LPAREN TITLE TEXT_LITERAL COMMA ROOT LABEL_LITERAL COMMA NARR_LABEL LABEL_LITERAL RPAREN {
     Nar {
       title = $6;
@@ -221,7 +213,7 @@ expr_rule:
     }
   }
 
- (* item object declaration and storage *)
+
 | VARIABLE EQ ITEM LPAREN TEXT_LITERAL COMMA TEXT_LITERAL COMMA INT_LITERAL COMMA
   BOOL_LITERAL COMMA INT_LITERAL COMMA INT_LITERAL COMMA BOOL_LITERAL RPAREN {
     Itm {
@@ -236,7 +228,6 @@ expr_rule:
     }
   }
 
- (* character object declaration and storage *)
 | VARIABLE EQ CHARACTER LPAREN TEXT_LITERAL COMMA INT_LITERAL COMMA INT_LITERAL RPAREN {
     Chrc {
       var_name = $1;
@@ -248,7 +239,7 @@ expr_rule:
   }
  | expr_rule EOL { $1 }
 
- (* /node block - declare and store single node variable *)
+
 node_rules:
 | VARIABLE COLON TEXT_LITERAL opt_list {
     let options = List.map (function
