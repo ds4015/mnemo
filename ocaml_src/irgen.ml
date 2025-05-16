@@ -172,6 +172,8 @@ in
   let main_fn = L.define_function "main" main_ty the_mod in
   let builder = L.builder_at_end ctx (L.entry_block main_fn) in
 
+  let empty_str = L.build_global_stringptr "" "empty_str" builder in
+
   let rec build_expr builder ((_, e) : sexpr) = match e with
     | SIntLit i      -> L.const_int i32_t i
     | SBoolLit b     -> L.const_int i1_t (if b then 1 else 0)
@@ -225,16 +227,13 @@ in
         let array_ty = L.array_type tuple_t max_entries in
         let raw_opts_ptr = L.build_malloc array_ty "opts_arr" builder in
 
-        for i = 0 to max_entries - 1 do
-          let idx = L.const_int i32_t i in
-          let elem_ptr = L.build_in_bounds_gep raw_opts_ptr [| L.const_int i32_t 0; idx |] ("opt_elem" ^ string_of_int i) builder in
-          let null_text = L.build_global_stringptr "" "null_text" builder in
-          let null_id = L.const_int i32_t 0 in
-          let fld0 = L.build_in_bounds_gep elem_ptr [| L.const_int i32_t 0; L.const_int i32_t 0 |] "f0" builder in
-          let fld1 = L.build_in_bounds_gep elem_ptr [| L.const_int i32_t 0; L.const_int i32_t 1 |] "f1" builder in
-          ignore (L.build_store null_text fld0 builder);
-          ignore (L.build_store null_id fld1 builder)
-        done;
+        let memset_ty = L.function_type (L.void_type ctx) 
+                        [| L.pointer_type (L.i8_type ctx); L.i8_type ctx; L.i64_type ctx; L.i1_type ctx |] in
+        let memset_fn = L.declare_function "llvm.memset.p0i8.i64" memset_ty the_mod in
+        
+        let array_size = L.const_int (L.i64_type ctx) (max_entries * 16) in  (* 16 = size of tuple_t *)
+        let array_ptr = L.build_bitcast raw_opts_ptr (L.pointer_type (L.i8_type ctx)) "array_ptr" builder in
+        ignore (L.build_call memset_fn [| array_ptr; L.const_int (L.i8_type ctx) 0; array_size; L.const_int (L.i1_type ctx) 0 |] "" builder);
 
         List.iteri (fun i (opt_text, next_lbl) ->
           let idx = L.const_int i32_t i in
@@ -245,7 +244,6 @@ in
 
           let next_id =
             try 
-
               let clean_label = String.map (fun c -> if c = '!' then '_' else c) next_lbl in
               let id = StringMap.find clean_label label_to_id in
               id
