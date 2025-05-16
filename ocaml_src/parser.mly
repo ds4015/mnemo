@@ -44,9 +44,11 @@
 
 // (* main program - sequence of code blocks, node blocks, nodeS blocks *)
 exprs_rule:
-  | blocks { Seq $1 }
+  | blocks EOF { Seq $1 }
+  | /* none */ EOF { Seq [] }
 
 blocks:
+  | /* none */ { [] }
   | block              { [$1] }
   | blocks block       { $1 @ [$2] }
 block:
