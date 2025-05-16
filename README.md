@@ -30,6 +30,8 @@ ocamlfind ocamlopt \
 ./mnemo test_game.txt test_game.ll
 llc -filetype=obj -relocation-model=pic test_game.ll -o test_game.o
 clang test_game.o -o test_game
+(NOTE: for Ubuntu, if the above line command gives dynamic memory error, try this command instead:
+clang test_game.o -o test_game -no-pie)
 ./test_game
 ```
 
