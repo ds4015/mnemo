@@ -30,10 +30,8 @@
 %token <string> VARIABLE
 %token EOF EOL
 
-%right EOF EOL
+%right EOL
 %right EQ
-%left OR
-%left AND
 %left IS NOT GT LT GTE LTE
 %left PLUS MINUS
 %left TIMES DIVIDE
@@ -46,32 +44,28 @@
 
 // (* main program - sequence of code blocks, node blocks, nodeS blocks *)
 exprs_rule:
-  | blocks { Seq (List.flatten $1) }
+  | blocks { Seq $1 }
 
 blocks:
   | block              { [$1] }
   | blocks block       { $1 @ [$2] }
-
 block:
- | CODE_BLOCK exprs_seq END_CODE_BLOCK       { [CodeBlock("CODE_BLOCK", $2, "END_CODE_BLOCK")]    }
- | NODE_BLOCK node_rules END_NODE_BLOCK      { [NodeBlock("NODE_BLOCK", [$2], "END_NODE_BLOCK")]  }
- | NODES_BLOCK node_stream END_NODES_BLOCK   { [NodeStream("NODES_BLOCK", $2, "END_NODES_BLOCK")] }
+  | CODE_BLOCK exprs_seq END_CODE_BLOCK {
+      CodeBlock("CODE_BLOCK", $2, "END_CODE_BLOCK")
+    }
+  | NODE_BLOCK node_rules END_NODE_BLOCK {
+      NodeBlock("NODE_BLOCK", [$2], "END_NODE_BLOCK")
+    }
+  | NODES_BLOCK node_stream END_NODES_BLOCK {
+      NodeStream("NODES_BLOCK", $2, "END_NODES_BLOCK")
+    }
 
 // (* code block - sequence of non-node expressions *)
 exprs_seq:
  | expr_rule { [$1] }
  | exprs_seq expr_rule { $1 @ [$2] }
- 
-elif_clauses:
-| { [] }
-| ELIF expr_rule exprs_seq elif_clauses
-   { ($2, $3) :: $4 }
 
-else_clause:
-| { None }
-| ELSE exprs_seq { Some($2) }
-
-// (* stream of nodes - /nodes block *)
+(* stream of nodes - /nodes block *)
 node_stream:
    | node_expr { [$1] }
    | node_stream node_expr { $1 @ [$2] }
@@ -83,30 +77,30 @@ node_expr:
                 | Tup (TextLit text_lit, LabelLit label_lit) -> (text_lit, label_lit) 
                 | _ -> failwith "Expected (Text or Label) in opt_list"
             ) $4 in 
-         let node = { character = $1; id = !node_counter; dialogue = $3; label = ""; options = options; next = !node_counter + 1 } in 
-         node_counter := !node_counter + 1;
-         Nde node
+        let node = Nde($1, !node_counter, $3, "", options, !node_counter + 1) in
+        node_counter := !node_counter + 1;
+        node
    }
  | VARIABLE COLON TEXT_LITERAL {
-        let node = { character = $1; id = !node_counter; dialogue = $3; label = ""; options = []; next = !node_counter + 1 } in 
-         node_counter := !node_counter + 1;
-         Nde node
+        let node = Nde($1, !node_counter, $3, "", [], !node_counter + 1) in
+        node_counter := !node_counter + 1; node
    }
  | VARIABLE COLON TEXT_LITERAL COMMA LABEL LABEL_LITERAL {
-        let node = { character = $1; id = !node_counter; dialogue = $3; label = $6; options = []; next = !node_counter + 1 } in 
-         node_counter := !node_counter + 1;
-         Nde node
+        let node = Nde($1, !node_counter, $3, $6, [], !node_counter + 1) in
+        node_counter := !node_counter + 1; node
       }
  | VARIABLE COLON TEXT_LITERAL COMMA LABEL LABEL_LITERAL opt_list {
  let options = List.map (fun expr ->
         match expr with
         | Tup (TextLit text_lit, LabelLit label_lit) -> (text_lit, label_lit) 
         | _ -> failwith "Expected (Text or Label) in opt_list"
-    ) $7 in 
-         node_counter := !node_counter + 1;    
-         let node = { character = $1; id = !node_counter; dialogue = $3; label = $6; options = options; next = !node_counter + 1 } in 
-         Nde node
+    ) $7 in     
+        node_counter := !node_counter + 1;
+        let node = Nde($1, !node_counter, $3, $6, options, !node_counter + 1) in
+        node
     }
+  }
+
 
 // (* node options - tree branch *)
 opt_list:
@@ -138,43 +132,35 @@ expr_rule:
  | expr_rule PLUSPLUS { Unop ($1, Incr) }
  | expr_rule MINUSMINUS { Unop ($1, Decr) }
  | NOT expr_rule { Unop ($2, Not) }
- | IF expr_rule exprs_seq elif_clauses else_clause
-     { IfExpr($2, $3, $4, $5) }
  | VARIABLE EQ expr_rule { Asn ($1, $3) }
 //  (* add item to inventory *)
  | VARIABLE DOT INVENTORY DOT ADD LPAREN VARIABLE RPAREN { AddItem ($1, $7) }
-//  (* narrative object declaration and storage - all permutations *)
+ (* narrative object declaration and storage - all permutations *)
  | VARIABLE EQ NARRATIVE LPAREN TITLE TEXT_LITERAL COMMA ROOT LABEL_LITERAL COMMA
-    NARR_LABEL LABEL_LITERAL RPAREN     { let narr = { title=$6; root=$9; narr_label=$12} in Nar narr }
-
+    NARR_LABEL LABEL_LITERAL RPAREN     { Nar($1, $6, $9, $12) }
  | VARIABLE EQ NARRATIVE LPAREN TITLE TEXT_LITERAL COMMA ROOT LABEL_LITERAL COMMA
-    LABEL_LITERAL RPAREN    { let narr = { title=$6; root=$9; narr_label=$11} in Nar narr }
-
+    LABEL_LITERAL RPAREN     { Nar($1, $6, $9, $11) }
  | VARIABLE EQ NARRATIVE LPAREN TITLE TEXT_LITERAL COMMA LABEL_LITERAL COMMA
-    NARR_LABEL LABEL_LITERAL RPAREN     { let narr = { title=$6; root=$8; narr_label=$11} in Nar narr }
-
+    NARR_LABEL LABEL_LITERAL RPAREN     { Nar($1, $6, $8, $11) }
  | VARIABLE EQ NARRATIVE LPAREN TITLE TEXT_LITERAL COMMA LABEL_LITERAL COMMA
-    LABEL_LITERAL RPAREN     { let narr = { title=$6; root=$8; narr_label=$10} in Nar narr }
-
+    LABEL_LITERAL RPAREN     { Nar($1, $6, $8, $10) }
  | VARIABLE EQ NARRATIVE LPAREN TEXT_LITERAL COMMA ROOT LABEL_LITERAL COMMA
-    NARR_LABEL LABEL_LITERAL RPAREN     { let narr = { title=$5; root=$8; narr_label=$11} in Nar narr }
-
+    NARR_LABEL LABEL_LITERAL RPAREN     { Nar($1, $5, $8, $11) }
  | VARIABLE EQ NARRATIVE LPAREN TEXT_LITERAL COMMA ROOT LABEL_LITERAL COMMA
-    LABEL_LITERAL RPAREN     { let narr = { title=$5; root=$8; narr_label=$10} in Nar narr }
-
+    LABEL_LITERAL RPAREN     { Nar($1, $5, $8, $10) }
  | VARIABLE EQ NARRATIVE LPAREN TEXT_LITERAL COMMA LABEL_LITERAL COMMA
-    NARR_LABEL LABEL_LITERAL RPAREN    { let narr = { title=$5; root=$7; narr_label=$10} in Nar narr }
+    NARR_LABEL LABEL_LITERAL RPAREN     { Nar($1, $5, $7, $10) }
  | VARIABLE EQ NARRATIVE LPAREN TEXT_LITERAL COMMA LABEL_LITERAL COMMA
-    LABEL_LITERAL RPAREN    { let narr = { title=$5; root=$7; narr_label=$9} in Nar narr }
-// (* item object declaration and storage *)
+    LABEL_LITERAL RPAREN     { Nar($1, $5, $7, $9) }
+ (* item object declaration and storage *)
  | VARIABLE EQ ITEM LPAREN TEXT_LITERAL COMMA TEXT_LITERAL COMMA INT_LITERAL COMMA
     BOOL_LITERAL COMMA INT_LITERAL COMMA INT_LITERAL COMMA BOOL_LITERAL
     RPAREN 
-        { let item = { var_name = $1; iname = $5; usage = $7; num = $9; unique = $11; dur = $13; cost = $15; cons = $17} in Itm item}
-//  (* character object declaration and storage *)
+        { Itm($1, $5, $7, $9, $11, $13, $15, $17) }
+ (* character object declaration and storage *)
  | VARIABLE EQ CHARACTER LPAREN TEXT_LITERAL COMMA INT_LITERAL COMMA
-    INT_LITERAL RPAREN
-        { let chrctr = {var_name = $1; name = $5; level = $7; hp = $9; inventory = []} in Chrc chrctr }
+    INT_LITERAL RPAREN 
+        { Chrc($1, $5, $7, $9, []) }
  | expr_rule EOL { $1 }
 
 //  (* /node block - declare and store single node variable *)
@@ -185,19 +171,17 @@ node_rules:
                 | Tup (TextLit text_lit, LabelLit label_lit) -> (text_lit, label_lit) 
                 | _ -> failwith "Expected (Text or Label) in opt_list"
             ) $4 in 
-        let node = { character = $1; id = !node_counter; dialogue = $3; label = ""; options = options; next = !node_counter + 1 } in 
-         node_counter := !node_counter + 1;
-         Nde node
+        let node = Nde($1, !node_counter, $3, "", options, !node_counter + 1) in
+        node_counter := !node_counter + 1;
+        node
    }
  | VARIABLE COLON TEXT_LITERAL {
-        let node = { character = $1; id = !node_counter; dialogue = $3; label = ""; options = []; next = !node_counter + 1 } in 
-         node_counter := !node_counter + 1;
-         Nde node
+        let node = Nde($1, !node_counter, $3, "", [], !node_counter + 1) in
+        node_counter := !node_counter + 1; node
    }
  | VARIABLE COLON TEXT_LITERAL COMMA LABEL LABEL_LITERAL {
-        let node = { character = $1; id = !node_counter; dialogue = $3; label = $6; options = []; next = !node_counter + 1 } in 
-         node_counter := !node_counter + 1;
-         Nde node
+        let node = Nde($1, !node_counter, $3, $6, [], !node_counter + 1) in
+        node_counter := !node_counter + 1; node
       }
  | VARIABLE COLON TEXT_LITERAL COMMA LABEL LABEL_LITERAL opt_list {
  let options = List.map (fun expr ->
@@ -205,7 +189,7 @@ node_rules:
         | Tup (TextLit text_lit, LabelLit label_lit) -> (text_lit, label_lit) 
         | _ -> failwith "Expected (Text or Label) in opt_list"
     ) $7 in     
-         node_counter := !node_counter + 1;    
-         let node = { character = $1; id = !node_counter; dialogue = $3; label = $6; options = options; next = !node_counter + 1 } in 
-         Nde node
+        node_counter := !node_counter + 1;
+        let node = Nde($1, !node_counter, $3, $6, options, !node_counter + 1) in
+        node
     }
