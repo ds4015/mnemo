@@ -52,15 +52,14 @@ and sx =
     | SVar of symbol
     | SSeq of sexpr list
     | STup of sexpr * sexpr
-    | SProcOpt of ((string * string) list) * Ast.node
     | SAsn of symbol * sexpr
-    | SNar of string * string * string * string
-    | SItm of string * string * string * int * bool * int * int * bool
-    | SNde of string * int * string * string * (string * string) list * int
+    | SNar of narr
+    | SItm of item
+    | SNde of node
     | SNodeStream of string * sexpr list * string
     | SCodeBlock of string * sexpr list * string
     | SNodeBlock of string * sexpr list * string
-    | SChrc of string * string * int * int * item list
+    | SChrc of chrctr
     | SAddItem of string * string
     | SIfExpr of sexpr * sexpr list * (sexpr * sexpr list) list * sexpr list option
 
@@ -97,18 +96,9 @@ let rec string_of_sexpr (t, e) =
         | STup (e1, e2) -> "(" ^ string_of_sexpr e1 ^ ", " ^ string_of_sexpr e2 ^ ")"
         | SAsn (s, e) -> "(" ^ string_of_symbol s ^ ", " ^ string_of_sexpr e ^ ")"
 
-        | SNar (_var, title, root, narr_label) ->
-            string_of_narrative { Ast.title; Ast.root; Ast.narr_label }
-
-        | SItm (var_name, iname, usage, num, unique, dur, cost, cons) ->
-            string_of_item { Ast.var_name; iname; usage; num; unique; dur; cost; cons }
-
-        | SNde (character, id, dialogue, label, options, next) ->
-            string_of_node { Ast.character; id; dialogue; label; options; next }
-
-        | SChrc (var_name, name, level, hp, inventory) ->
-            string_of_chrctr { Ast.var_name; name; level; hp; inventory }
-
+        | SNar (nar) -> string_of_narrative nar 
+        | SItm (itm) -> string_of_item itm
+        | SNde (n) -> string_of_node n
 
         | SNodeStream (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_sexpr l) ^ "], " ^ s2 ^ ")"
         | SCodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_sexpr l) ^ "], " ^ s2 ^ ")"
