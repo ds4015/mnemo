@@ -20,7 +20,7 @@ module StringMap = Map.Make(String)
 
 (* translate : Sast.program -> Llvm.module *)
 (* TODO: should it be (globals, functions) or something else? Is semantics.ml returning (globals, functions)? *)
-let translate (globals, functions) =
+let translate sexprs =
   let context    = L.global_context () in
 
   (* Create the LLVM compilation module into which
@@ -59,7 +59,7 @@ let translate (globals, functions) =
     [| str_t; str_t; str_t |] false in
 
   (* TODO: complete below if any type is missing  *)
-  let ltype_of_typ = function
+  let rec ltype_of_typ = function
       TInt -> i32_t
     | TBool -> i1_t
     | TFloat -> float_t
@@ -74,26 +74,33 @@ let translate (globals, functions) =
   in
 
   (* TODO: convert to semantic output, for now let's assume semantics.ml returns a list of sexprs (typ, sx) *)
-  let builder = L.builder_at_end context (L.entry_block the_function) in
+  let builder = L.builder context in
 
 
 
   (* Let's create CHARACTER MAP - e.g alice : llvm_addr *)
   let global_chars : L.llvalue StringMap.t =
     (* helper to generate llvm value of character *)
-    let gen_llvm_chr builder chr =
-      let var_name_val = L.build_global_stringptr chr.var_name "chr_var" builder in
-      let name_val = L.build_global_stringptr chr.name "chr_name" builder in
-      let level_val = L.const_int i32_t chr.level in
-      let hp_val = L.const_int i32_t chr.hp in
+    let gen_llvm_chr (builder : L.llbuilder) (charac : Ast.chrctr) =
+      let var_name_val = L.build_global_stringptr charac.var_name "chr_var" builder in
+      let name_val = L.build_global_stringptr charac.name "chr_name" builder in
+      let level_val = L.const_int i32_t charac.level in
+      let hp_val = L.const_int i32_t charac.hp in
       let inventory_val = L.const_null item_ptr_t in
       L.const_named_struct chrctr_t [| var_name_val; name_val; level_val; hp_val; inventory_val |]
   in
     (* function to allocate and load character from sexpr *)
     let rec collect_character_vars map (typ, sx) =
       match sx with
-      | SAsn (symbol, (_, SChrc chr)) ->
-        let llvm_chr = gen_llvm_chr builder chr in
+      | SAsn (symbol, (_, SChrc (var_name, name, level, hp, inventory))) ->
+        let charac : Ast.chrctr = {
+          var_name;
+          name;
+          level;
+          hp;
+          inventory;
+        } in
+        let llvm_chr = gen_llvm_chr builder charac in
         (* Allocate space for the character *)
         let addr = L.build_alloca (ltype_of_typ symbol.typ) symbol.name builder in
         (* Store llvm of char *)
@@ -104,15 +111,15 @@ let translate (globals, functions) =
           List.fold_left collect_character_vars map exprs
     
       | _ -> map
-    in List.fold_left collect_character_vars StringMap.empty sexprs in     (* TODO: don't know what how sast is returned, assuming you are given a list of sexprs  *)
+    in List.fold_left collect_character_vars StringMap.empty sexprs    (* TODO: don't know what how sast is returned, assuming you are given a list of sexprs  *)
 
   
-  
-  
+  in
+
     (* Let's create NODE MAP of nodes that have labels - e.g label : llvm_addr *)
   let global_nodes : L.llvalue StringMap.t =
     (* helper to generate llvm value of a node *)
-    let gen_llvm_node builder node =
+    let gen_llvm_node (builder : L.llbuilder) (node : Ast.node) =
       let character_val = L.build_global_stringptr node.character "node_char" builder in
       let id_val = L.const_int i32_t node.id in
       let dialogue_val = L.build_global_stringptr node.dialogue "node_dialogue" builder in
@@ -120,10 +127,9 @@ let translate (globals, functions) =
   
       (* Build option list: array of { i8*, i8* } tuples *)
       let option_vals = List.map (fun (s1, s2) ->
-        L.const_struct context [|
-          L.const_global_stringptr s1 context;
-          L.const_global_stringptr s2 context
-        |]
+        let s1_val = L.build_global_stringptr s1 "opt1" builder in
+        let s2_val = L.build_global_stringptr s2 "opt2" builder in
+        L.const_struct context [| s1_val; s2_val |]
       ) node.options in
       
 
@@ -148,7 +154,15 @@ let translate (globals, functions) =
     (* function to allocate and load node from sexpr *)
     let rec collect_label_nodes map (typ, sx) =
       match sx with
-      | SNde node ->
+      | SNde (character, id, dialogue, label, options, next) ->
+        let node : Ast.node = {
+          character;
+          id;
+          dialogue;
+          label;
+          options;
+          next;
+        } in
           let llvm_node = gen_llvm_node builder node in (* generate llvm of labeled node *)
           let addr = L.build_alloca node_t node.label builder in (* allocate space *)
           ignore (L.build_store llvm_node addr builder); (* store value of labeled node onto stack *)
@@ -159,9 +173,10 @@ let translate (globals, functions) =
   
       | _ -> map
     in
-    List.fold_left collect_label_nodes StringMap.empty sexprs in (* TODO: don't know what how sast is returned, assuming you are given a list of sexprs  *)
+    List.fold_left collect_label_nodes StringMap.empty sexprs (* TODO: don't know what how sast is returned, assuming you are given a list of sexprs  *)
   
 
+  in
 
   (* Functions for printing and scanning *)
   let printf_t : L.lltype =
@@ -174,7 +189,7 @@ let translate (globals, functions) =
 
 
   (*  Functions to build instructions to print a node's dialogue *)
-  let print_node_dialogue builder node =
+  let print_node_dialogue (builder : L.llbuilder) (node : Ast.node) =
       (* 1. Print dialogue *)
       let fmt_dialogue = L.build_global_stringptr "%s\n" "fmt_dialogue" builder in (* format of dialogue *)
       let dialogue_str = L.build_global_stringptr node.dialogue "dialogue_str" builder in  (* generate llvm code for node.dialogue *)
@@ -228,23 +243,30 @@ let translate (globals, functions) =
 
           ignore (L.position_at_end cont_bb builder) (* move main builder's cursor to the end of cont_bb block *)
         ) global_nodes;
-      )
+      ) in
     
   
   (* function to iterate over list of sexpr *)
   let rec emit_dialogues builder sexprs =
     List.iter (fun (_, sx) ->
       match sx with
-      | SNde node ->
+      | SNde (character, id, dialogue, label, options, next) ->
+          let node : Ast.node = {
+            character;
+            id;
+            dialogue;
+            label;
+            options;
+            next;
+          } in
           print_node_dialogue builder node
   
       | SSeq exprs ->
           emit_dialogues builder exprs
   
       | _ -> ()
-    ) sexprs;
+    ) sexprs in
   
-  emit_dialogues builder sexprs (* generate ir_code over all the nodes in sexprs *)
+  emit_dialogues builder sexprs; (* generate ir_code over all the nodes in sexprs *)
 
   the_module
-
