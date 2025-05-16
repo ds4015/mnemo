@@ -9,16 +9,16 @@ open Ast
 (* types *)
 type typ = 
  | TInt
+ | TString
  | TBool
  | TFloat
- | TString
  | TNode
  | TNar
- | TItem
  | TChar
  | TUnit
- | TTup of typ * typ
+ | TItem
  | TList of typ
+ | TTup of typ * typ
 
 (* for vars *)
 module Symbol = struct
@@ -38,7 +38,7 @@ end
 (* for vars and assignments *)
 type symbol = Symbol.t
 
-(* sexprs (sexy expressions) *)
+(* sexprs (sexy expressions)*)
 type sexpr = typ * sx
 and sx =
     SBinop of sexpr * operator * sexpr
@@ -48,19 +48,19 @@ and sx =
     | SBoolLit of bool
     | SLabelLit of string
     | SFloatLit of float
-    (* | SNode of snode     *)
+    | SNode of Ast.node    
     | SVar of symbol
     | SSeq of sexpr list
     | STup of sexpr * sexpr
-    | SProcOpt of (sexpr list) * node
+    | SProcOpt of ((string * string) list) * Ast.node
     | SAsn of symbol * sexpr
-    | SNar of narr
-    | SItm of item
-    | SNde of node
+    | SNar of string * string * string * string
+    | SItm of string * string * string * int * bool * int * int * bool
+    | SNde of string * int * string * string * (string * string) list * int
     | SNodeStream of string * sexpr list * string
     | SCodeBlock of string * sexpr list * string
     | SNodeBlock of string * sexpr list * string
-    | SChrc of chrctr
+    | SChrc of string * string * int * int * item list
     | SAddItem of string * string
     | SIfExpr of sexpr * sexpr list * (sexpr * sexpr list) list * sexpr list option
 
@@ -95,16 +95,24 @@ let rec string_of_sexpr (t, e) =
         | SVar (s) -> string_of_symbol s
         | SSeq (l) -> String.concat ", " (List.map string_of_sexpr l)
         | STup (e1, e2) -> "(" ^ string_of_sexpr e1 ^ ", " ^ string_of_sexpr e2 ^ ")"
-        | SProcOpt (l, n) -> 
-            "([" ^ String.concat ", " (List.map string_of_sexpr l) ^ "], " ^ string_of_node n ^ ")"
         | SAsn (s, e) -> "(" ^ string_of_symbol s ^ ", " ^ string_of_sexpr e ^ ")"
-        | SNar (nar) -> string_of_narrative nar 
-        | SItm (itm) -> string_of_item itm
-        | SNde (n) -> string_of_node n
+
+        | SNar (_var, title, root, narr_label) ->
+            string_of_narrative { Ast.title; Ast.root; Ast.narr_label }
+
+        | SItm (var_name, iname, usage, num, unique, dur, cost, cons) ->
+            string_of_item { Ast.var_name; iname; usage; num; unique; dur; cost; cons }
+
+        | SNde (character, id, dialogue, label, options, next) ->
+            string_of_node { Ast.character; id; dialogue; label; options; next }
+
+        | SChrc (var_name, name, level, hp, inventory) ->
+            string_of_chrctr { Ast.var_name; name; level; hp; inventory }
+
+
         | SNodeStream (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_sexpr l) ^ "], " ^ s2 ^ ")"
         | SCodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_sexpr l) ^ "], " ^ s2 ^ ")"
         | SNodeBlock (s1, l, s2) -> "(" ^ s1 ^ ", [" ^ String.concat ", " (List.map string_of_sexpr l) ^ "], " ^ s2 ^ ")"
-        | SChrc (chrc) -> string_of_chrctr chrc
         | SAddItem (s1, s2) -> "(" ^ s1 ^ ", " ^ s2 ^ ")"
         | SIfExpr (e1, l1, l2, l3) -> 
             let option_string ll = 
