@@ -7,11 +7,15 @@ NOTES/README - Dallas
 
 The scanner, parser, AST, SAST, semantic analyzer, IRgen, and main driver are all functional and working.  
 
+
+https://github.com/user-attachments/assets/daab91a7-fd63-4b77-8aca-058cff3303d9
+
 To compile (updated build instructions 5/16/25):
 
 ```
 brew install menhir
 
+cd ocaml_src
 ocamlc -c ast.ml
 ocamlc -c sast.ml
 ocamllex scanner.mll
@@ -32,10 +36,6 @@ clang test_game.o -o test_game
 test_game.txt can be replaced with any source code file in the Mnemo language
 
 This will run the dialogue stream sequentially in the terminal and process branch options from user input.
-
-Demo:
-
-https://github.com/user-attachments/assets/daab91a7-fd63-4b77-8aca-058cff3303d9
 
 Earlier conception using runtime evaluator and OCaml Graphics GUI (experimental/non-IR):
 
