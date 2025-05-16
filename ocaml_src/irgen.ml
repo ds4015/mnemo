@@ -6,6 +6,7 @@ open Sast
 
 module StringMap = Map.Make(String)
 
+let max_entries = 256
 
 let translate (globals, sprogram) =
   let ctx     = L.global_context () in
@@ -16,16 +17,40 @@ let translate (globals, sprogram) =
   let float_t = L.double_type ctx in
   let str_t   = L.pointer_type (L.i8_type ctx) in
 
+  let rec process_expr m = function
+    | SNde nd ->
+        if nd.label <> "" then
+          let clean_label = String.map (fun c -> if c = '!' then '_' else c) nd.label in
+          StringMap.add clean_label nd.id m
+        else
+          m
+    | SNodeBlock(_, exprs, _) ->
+        List.fold_left (fun m (_, e) -> process_expr m e) m exprs
+    | SNodeStream(_, exprs, _) ->
+        List.fold_left (fun m (_, e) -> process_expr m e) m exprs
+    | SSeq exprs ->
+        List.fold_left (fun m (_, e) -> process_expr m e) m exprs
+    | SCodeBlock(_, exprs, _) ->
+        List.fold_left (fun m (_, e) -> process_expr m e) m exprs
+    | _ -> m
+  in
+
   let label_to_id =
   List.fold_left (fun m (_, sx) ->
-    match sx with
-    | SNde nd ->
-        StringMap.add nd.label nd.id m
-    | _ -> m
+      (match sx with
+       | SNde _ -> "SNde"
+       | SSeq _ -> "SSeq"
+       | SCodeBlock _ -> "SCodeBlock"
+       | SNodeBlock _ -> "SNodeBlock"
+       | SNodeStream _ -> "SNodeStream"
+       | _ -> "Other");
+    process_expr m sx
   ) StringMap.empty sprogram
 in
 
-  let tuple_t   = L.struct_type ctx [| str_t; str_t |] in
+  
+
+  let tuple_t   = L.struct_type ctx [| str_t; i32_t |] in
   let tuple_ptr = L.pointer_type tuple_t in
 
   let item_t = L.named_struct_type ctx "item" in
@@ -38,7 +63,7 @@ in
       i32_t;       (* id *)
       str_t;       (* dialogue *)
       str_t;       (* label *)
-      tuple_ptr;   (* options pointer or NULL *)
+      L.pointer_type (L.array_type tuple_t max_entries);  
       i32_t;       (* num_options *)
       i32_t        (* next_id *)
     |] false in
@@ -52,8 +77,6 @@ in
     [| str_t; str_t; str_t |] false in
 
 
-  let max_entries = 256 in
-
   (* narrative table *)
   let narr_arr_ty  = L.array_type    (L.pointer_type narr_t) max_entries in
   let narr_array   = L.define_global "narr_arr" (L.const_null narr_arr_ty) the_mod in
@@ -63,7 +86,6 @@ in
   let narr_add_fn  = L.define_function "NarrativeTable_add" narr_add_ft the_mod in
   let bldr_narr    = L.builder_at_end ctx (L.entry_block narr_add_fn) in
 
-  (* Now use the bound `narr_idx` directly: *)
   let curr_n = L.build_load narr_idx "curr" bldr_narr in
   let slot_n = L.build_in_bounds_gep narr_array
                 [| L.const_int i32_t 0; curr_n |]
@@ -184,44 +206,79 @@ in
         let ptr = try StringMap.find sym.name global_vars
                   with Not_found -> failwith ("unknown global "^sym.name) in
         ignore(L.build_store v ptr builder); v
-    | SSeq exprs
-    | SCodeBlock(_,exprs,_) 
-    | SNodeBlock(_,exprs,_) 
-    | SNodeStream(_,exprs,_)->
+    | SCodeBlock(_, exprs, _) ->
         List.fold_left (fun _ e -> build_expr builder e) (L.const_int i32_t 0) exprs
-| SNde nd ->
-    let ch       = L.build_global_stringptr nd.character "ch" builder in
-    let nid      = L.const_int             i32_t nd.id in
-    let dlg      = L.build_global_stringptr nd.dialogue  "dlg" builder in
-    let lbl      = L.build_global_stringptr nd.label     "lbl" builder in
+    | SNodeBlock(_, exprs, _) ->
+        List.fold_left (fun _ e -> build_expr builder e) (L.const_int i32_t 0) exprs
+    | SNodeStream(_, exprs, _) ->
+        List.fold_left (fun _ e -> build_expr builder e) (L.const_int i32_t 0) exprs
+    | SNde nd ->
+        let ch       = L.build_global_stringptr nd.character "ch" builder in
+        let nid      = L.const_int             i32_t nd.id in
+        let dlg      = L.build_global_stringptr nd.dialogue  "dlg" builder in
+        let lbl      = L.build_global_stringptr nd.label     "lbl" builder in
 
-    let opts_ptr = L.const_null tuple_ptr in
-    let num_opts = L.const_int  i32_t 0 in
+        let opts = nd.options in
+        let num_opts = List.length opts in
+        let num_opts_const = L.const_int i32_t num_opts in
 
-    let nxt      = L.const_int  i32_t nd.next in
+        let array_ty = L.array_type tuple_t max_entries in
+        let raw_opts_ptr = L.build_malloc array_ty "opts_arr" builder in
 
-    let node_ptr = L.build_malloc node_t "node" builder in
+        for i = 0 to max_entries - 1 do
+          let idx = L.const_int i32_t i in
+          let elem_ptr = L.build_in_bounds_gep raw_opts_ptr [| L.const_int i32_t 0; idx |] ("opt_elem" ^ string_of_int i) builder in
+          let null_text = L.build_global_stringptr "" "null_text" builder in
+          let null_id = L.const_int i32_t 0 in
+          let fld0 = L.build_in_bounds_gep elem_ptr [| L.const_int i32_t 0; L.const_int i32_t 0 |] "f0" builder in
+          let fld1 = L.build_in_bounds_gep elem_ptr [| L.const_int i32_t 0; L.const_int i32_t 1 |] "f1" builder in
+          ignore (L.build_store null_text fld0 builder);
+          ignore (L.build_store null_id fld1 builder)
+        done;
 
-    let store_field idx value =
-      let fld = L.build_in_bounds_gep node_ptr
-                  [| L.const_int i32_t 0; L.const_int i32_t idx |]
-                  ("f" ^ string_of_int idx)
-                  builder
-      in
-      ignore (L.build_store value fld builder)
-    in
+        List.iteri (fun i (opt_text, next_lbl) ->
+          let idx = L.const_int i32_t i in
+          let elem_ptr = L.build_in_bounds_gep raw_opts_ptr [| L.const_int i32_t 0; idx |] ("opt_elem" ^ string_of_int i) builder in
+          let text_val = L.build_global_stringptr opt_text "opt_txt" builder in
+          let fld0 = L.build_in_bounds_gep elem_ptr [| L.const_int i32_t 0; L.const_int i32_t 0 |] "f0" builder in
+          ignore (L.build_store text_val fld0 builder);
 
-    store_field 0 ch;       (* character *)
-    store_field 1 nid;      (* id        *)
-    store_field 2 dlg;      (* dialogue  *)
-    store_field 3 lbl;      (* label     *)
-    store_field 4 opts_ptr; (* options   *)
-    store_field 5 num_opts; (* num_opts  *)
-    store_field 6 nxt;      (* next_id   *)
+          let next_id =
+            try 
 
-    ignore (L.build_call node_table_add_fn [| node_ptr |] "" builder);
+              let clean_label = String.map (fun c -> if c = '!' then '_' else c) next_lbl in
+              let id = StringMap.find clean_label label_to_id in
+              id
+            with Not_found -> 
+              Printf.printf "    Failed to find label '%s' in map. Available labels:\n" next_lbl;
+              StringMap.iter (fun label id -> Printf.printf "      %s -> %d\n" label id) label_to_id;
+              failwith (Printf.sprintf "Unknown label: '%s' (cleaned: '%s'). Available labels: %s" 
+                next_lbl 
+                (String.map (fun c -> if c = '!' then '_' else c) next_lbl)
+                (String.concat ", " (List.map fst (StringMap.bindings label_to_id))))
+          in
+          let fld1 = L.build_in_bounds_gep elem_ptr [| L.const_int i32_t 0; L.const_int i32_t 1 |] "f1" builder in
+          ignore (L.build_store (L.const_int i32_t next_id) fld1 builder)
+        ) opts;
 
-    L.const_int i32_t 0
+        let opts_ptr = raw_opts_ptr in
+        let num_opts_val = num_opts_const in
+
+        let node_ptr = L.build_malloc node_t "node" builder in
+        let store_field idx value = 
+          let field_ptr = L.build_in_bounds_gep node_ptr [| L.const_int i32_t 0; L.const_int i32_t idx |] "field" builder in
+          ignore (L.build_store value field_ptr builder)
+        in
+        store_field 0 ch;
+        store_field 1 nid;
+        store_field 2 dlg;
+        store_field 3 lbl;
+        store_field 4 opts_ptr;   
+        store_field 5 num_opts_val; 
+        store_field 6 (L.const_int i32_t nd.next);
+      
+        ignore (L.build_call node_table_add_fn [| node_ptr |] "" builder);
+        L.const_int i32_t 0
     | _              -> L.const_int i32_t 0
   in
 
@@ -232,6 +289,8 @@ let printf_ty = L.var_arg_function_type i32_t [| L.pointer_type (L.i8_type ctx) 
 let printf_fn = L.declare_function "printf" printf_ty the_mod in
 let scanf_ty  = L.var_arg_function_type i32_t [| L.pointer_type (L.i8_type ctx) |] in
 let scanf_fn  = L.declare_function "scanf" scanf_ty the_mod in
+let getchar_ty = L.function_type i32_t [||] in
+let getchar_fn = L.declare_function "getchar" getchar_ty the_mod in
 
 let fmt_node = L.build_global_stringptr "%s: %s\n\n"    "fmt_node" builder in
 let fmt_int  = L.build_global_stringptr "%d"            "fmt_int"  builder in
@@ -257,37 +316,98 @@ let b_body      = L.builder_at_end ctx body_bb in
 let gep         = L.build_in_bounds_gep node_array [| L.const_int i32_t 0; cur |] "node_ptr_ptr" b_body in
 let node_ptr    = L.build_load gep "node_ptr" b_body in
 
-
 let ch_ptr   = L.build_in_bounds_gep node_ptr [| L.const_int i32_t 0; L.const_int i32_t 0 |] "ch_ptr" b_body in
 let ch       = L.build_load ch_ptr "ch" b_body in
 let dlg_ptr  = L.build_in_bounds_gep node_ptr [| L.const_int i32_t 0; L.const_int i32_t 2 |] "dlg_ptr" b_body in
 let dlg      = L.build_load dlg_ptr "dlg" b_body in
 
 
-ignore (L.build_call printf_fn [| fmt_node; ch; dlg |] "" b_body);
-
-let choice_ptr = L.build_alloca i32_t "choice_ptr" b_body in
-ignore (L.build_call scanf_fn  [| fmt_int; choice_ptr |] "" b_body);
-let choice     = L.build_load choice_ptr "choice" b_body in
-
-let next_ptr = L.build_in_bounds_gep node_ptr
-                 [| L.const_int i32_t 0; L.const_int i32_t 6 |]
-                 "next_ptr" b_body in
-let stored_next = L.build_load next_ptr "stored_next" b_body in
+let num_opts_ptr = L.build_in_bounds_gep node_ptr [| L.const_int i32_t 0; L.const_int i32_t 5 |] "num_opts_ptr" b_body in
+let num_opts = L.build_load num_opts_ptr "num_opts" b_body in
 
 
-let ge0     = L.build_icmp L.Icmp.Sge choice (L.const_int i32_t 0)  "ge0"     b_body in
-let lt_count= L.build_icmp L.Icmp.Slt choice count "ltc"     b_body in
-let valid   = L.build_and ge0 lt_count "valid"   b_body in
+let fmt_bar = L.build_global_stringptr "----------------------------------------\n" "fmt_bar" b_body in
+let fmt_dialogue = L.build_global_stringptr "%s: %s\n" "fmt_dialogue" b_body in
+ignore (L.build_call printf_fn [| fmt_bar |] "" b_body);
+ignore (L.build_call printf_fn [| fmt_dialogue; ch; dlg |] "" b_body);
+ignore (L.build_call printf_fn [| fmt_bar |] "" b_body);
 
 
-let chosen_next =
-  L.build_select valid choice stored_next "chosen_next" b_body
-in
+let fmt_pause = L.build_global_stringptr "Press any key to continue...\n" "fmt_pause" b_body in
+ignore (L.build_call printf_fn [| fmt_pause |] "" b_body);
+ignore (L.build_call getchar_fn [||] "" b_body);
 
-ignore (L.build_store chosen_next cur_ptr b_body);
 
-ignore (L.build_br head_bb b_body);
+let has_opts = L.build_icmp L.Icmp.Sgt num_opts (L.const_int i32_t 0) "has_opts" b_body in
+let opts_bb = L.append_block ctx "opts" run_fn in
+let no_opts_bb = L.append_block ctx "no_opts" run_fn in
+ignore (L.build_cond_br has_opts opts_bb no_opts_bb b_body);
+
+
+let b_opts = L.builder_at_end ctx opts_bb in
+let opts_ptr = L.build_in_bounds_gep node_ptr [| L.const_int i32_t 0; L.const_int i32_t 4 |] "opts_ptr" b_opts in
+let opts = L.build_load opts_ptr "opts" b_opts in
+
+
+let fmt_opt_bar = L.build_global_stringptr "----------------------------------------\n" "fmt_opt_bar" b_opts in
+let fmt_opt = L.build_global_stringptr "%d: %s\n" "fmt_opt" b_opts in
+ignore (L.build_call printf_fn [| fmt_opt_bar |] "" b_opts);
+let i_ptr = L.build_alloca i32_t "i" b_opts in
+ignore (L.build_store (L.const_int i32_t 0) i_ptr b_opts);
+
+let opt_loop_head = L.append_block ctx "opt_loop_head" run_fn in
+let opt_loop_body = L.append_block ctx "opt_loop_body" run_fn in
+let opt_loop_exit = L.append_block ctx "opt_loop_exit" run_fn in
+
+ignore (L.build_br opt_loop_head b_opts);
+
+let b_opt_head = L.builder_at_end ctx opt_loop_head in
+let i = L.build_load i_ptr "i" b_opt_head in
+let opt_cond = L.build_icmp L.Icmp.Slt i num_opts "opt_cond" b_opt_head in
+ignore (L.build_cond_br opt_cond opt_loop_body opt_loop_exit b_opt_head);
+
+let b_opt_body = L.builder_at_end ctx opt_loop_body in
+let opt_elem = L.build_in_bounds_gep opts [| L.const_int i32_t 0; i |] "opt_elem" b_opt_body in
+let opt_text_ptr = L.build_in_bounds_gep opt_elem [| L.const_int i32_t 0; L.const_int i32_t 0 |] "opt_text_ptr" b_opt_body in
+let opt_text = L.build_load opt_text_ptr "opt_text" b_opt_body in
+ignore (L.build_call printf_fn [| fmt_opt; i; opt_text |] "" b_opt_body);
+let next_i = L.build_add i (L.const_int i32_t 1) "next_i" b_opt_body in
+ignore (L.build_store next_i i_ptr b_opt_body);
+ignore (L.build_br opt_loop_head b_opt_body);
+
+let b_opt_exit = L.builder_at_end ctx opt_loop_exit in
+ignore (L.build_call printf_fn [| fmt_opt_bar |] "" b_opt_exit);
+let choice_ptr = L.build_alloca i32_t "choice_ptr" b_opt_exit in
+let fmt_int = L.build_global_stringptr "%d" "fmt_int" b_opt_exit in
+ignore (L.build_call scanf_fn [| fmt_int; choice_ptr |] "" b_opt_exit);
+let choice = L.build_load choice_ptr "choice" b_opt_exit in
+
+
+let valid_choice = L.build_icmp L.Icmp.Slt choice num_opts "valid_choice" b_opt_exit in
+let invalid_bb = L.append_block ctx "invalid_choice" run_fn in
+let valid_bb = L.append_block ctx "valid_choice" run_fn in
+ignore (L.build_cond_br valid_choice valid_bb invalid_bb b_opt_exit);
+
+
+let b_invalid = L.builder_at_end ctx invalid_bb in
+let fmt_invalid = L.build_global_stringptr "Invalid choice. Please try again.\n" "fmt_invalid" b_invalid in
+ignore (L.build_call printf_fn [| fmt_invalid |] "" b_invalid);
+ignore (L.build_br opt_loop_head b_invalid);
+
+
+let b_valid = L.builder_at_end ctx valid_bb in
+let chosen_opt = L.build_in_bounds_gep opts [| L.const_int i32_t 0; choice |] "chosen_opt" b_valid in
+let next_id_ptr = L.build_in_bounds_gep chosen_opt [| L.const_int i32_t 0; L.const_int i32_t 1 |] "next_id_ptr" b_valid in
+let next_id = L.build_load next_id_ptr "next_id" b_valid in
+ignore (L.build_store next_id cur_ptr b_valid);
+ignore (L.build_br head_bb b_valid);
+
+
+let b_no_opts = L.builder_at_end ctx no_opts_bb in
+let next_ptr = L.build_in_bounds_gep node_ptr [| L.const_int i32_t 0; L.const_int i32_t 6 |] "next_ptr" b_no_opts in
+let next_id = L.build_load next_ptr "next_id" b_no_opts in
+ignore (L.build_store next_id cur_ptr b_no_opts);
+ignore (L.build_br head_bb b_no_opts);
 
 let b_exit = L.builder_at_end ctx exit_bb in
 ignore (L.build_ret (L.const_int i32_t 0) b_exit);
