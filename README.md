@@ -28,7 +28,7 @@ ocamlfind ocamlopt \
   ast.ml sast.ml parser.ml scanner.ml semant.ml irgen.ml main.ml \
   -o mnemo
 ./mnemo test_game.txt test_game.ll
-llc -filetype=obj test_game.ll -o test_game.o
+llc -filetype=obj -relocation-model=pic test_game.ll -o test_game.o
 clang test_game.o -o test_game
 ./test_game
 ```
